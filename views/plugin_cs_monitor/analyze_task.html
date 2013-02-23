@@ -1,0 +1,226 @@
+{{extend 'layout.html'}}
+
+<h3>Analyze task</h3>
+
+<div class="row">
+    <div class="span4">
+        <span>First Run: {{=prettydate(first_run.start_time)}}</span>
+        <span>Last Run: {{=prettydate(last_run.start_time)}}</span>
+        <ul>
+            <li>{{=A('Just this task : %s' % (task.uuid), _href=URL(args=request.args(0), user_signature=True))}}</li>
+            <li>{{=A('All tasks by function name : %s' % (task.function_name), _href=URL(args=(request.args(0), 'byfunction'), user_signature=True))}}</li>
+            <li>{{=A('All tasks by task name name : %s' % (task.task_name), _href=URL(args=(request.args(0), 'bytaskname'), user_signature=True))}}</li>
+            {{args = request.args}}
+            {{if len(args) == 1:}}
+                <li>{{=A('Just today', _href=URL(args=(request.args(0), 'this', 'bydate', 0), user_signature=True))}}</li>
+            {{elif len(args) == 2:}}
+                <li>{{=A('Just today', _href=URL(args=(request.args(0), request.args(1), 'bydate', 0), user_signature=True))}}</li>
+            {{elif len(args) == 4:}}
+                <li>{{=A('Previous Day', _href=URL(args=(request.args(0), request.args(1), 'byday', int(request.args(3)) + 1), user_signature=True))}}</li>
+                <li>{{=A('Next Day', _href=URL(args=(request.args(0), request.args(1), 'byday', int(request.args(3)) - 1), user_signature=True))}}</li>
+            {{pass}}
+        </ul>
+
+
+
+    </div>
+    <div class="span4 offset4">
+        <h4>Status</h4>
+        <div id="bystatus"></div>
+    </div>
+</div>
+{{if len(args) == 4:}}
+<div class="row">
+    <h4>Single Day</h4>
+    <div id="bydated"></div>
+</div>
+{{pass}}
+<div class="row">
+    <h4>Duration</h4>
+    <div id="byduration"></div>
+</div>
+<div class="row">
+    <h4>Dates</h4>
+    <div id="bydate"></div>
+</div>
+
+
+
+<script>
+$(function () {
+
+    var jgb_status_series = {{=XML(jgb_status_series)}};
+    var data = [];
+    var series = [];
+    var colors = [];
+    $.each(jgb_status_series, function(i, e) {
+        data.push(e['data']);
+        series.push({'label' : e['label']});
+        colors.push(e['color']);
+    });
+    if (data.length == 0) data = [null];
+
+    $.jqplot('bystatus',  [data],
+             {
+                seriesDefaults: {
+                    seriesColors : colors,
+                    renderer: jQuery.jqplot.PieRenderer,
+                    rendererOptions: {
+                        // Turn off filling of slices.
+                        fill: false,
+                        showDataLabels: true,
+                        // By default, data labels show the percentage of the donut/pie.
+                        // You can show the data 'value' or data 'label' instead.
+                        dataLabels: 'value',
+                        dataLabelThreshold : 10,
+                          // Add a margin to seperate the slices.
+                          sliceMargin: 2,
+                          // stroke the slices with a little thicker line.
+                          lineWidth: 2
+                    }
+                },
+                legend: { show:true, location: 'e' },
+                series : series
+            }
+    );
+
+    var jgb_duration_series = {{=XML(jgb_duration_series)}};
+    var data = [];
+    var series = [];
+    $.each(jgb_duration_series, function(i, e) {
+            data.push(e['data']);
+            series.push({'label' : e['label'], 'color' : e['color']});
+    });
+    if (data.length == 0) data = [[null]];
+    $.jqplot('byduration', data, {
+        // The "seriesDefaults" option is an options object that will
+        // be applied to all series in the chart.
+        cursor:{
+            show: true,
+            zoom: true
+            },
+        seriesDefaults:{
+            renderer:$.jqplot.BarRenderer,
+            pointLabels: { show: true, location: 'n', edgeTolerance: -15 },
+            rendererOptions: {fillToZero: true, barWidth : 5}
+        },
+        // Custom labels for the series are specified with the "label"
+        // option on the series option.  Here a series option object
+        // is specified for each series.
+        series:series,
+        // Show the legend and put it outside the grid, but inside the
+        // plot container, shrinking the grid to accomodate the legend.
+        // A value of "outside" would not shrink the grid and allow
+        // the legend to overflow the container.
+        legend:{
+           renderer: $.jqplot.EnhancedLegendRenderer,
+           show:true
+        },
+        highlighter: {
+          show: true,
+        },
+        axes: {
+            // Use a category axis on the x axis and use our custom ticks.
+            xaxis: {
+                renderer: $.jqplot.CategoryAxisRenderer,
+                rendererOptions:{sortMergedLabels:true},
+                label:'Seconds Elapsed'
+            },
+            yaxis : {
+                label : '# of tasks'
+            }
+        }
+
+    });
+
+    var jgb_when_series = {{=XML(jgb_when_series)}};
+    var data = [];
+    var series = [];
+    $.each(jgb_when_series, function(i, e) {
+            data.push(e['data']);
+            series.push({'label' : e['label'], 'color' : e['color']});
+    });
+    if (data.length == 0) data = [[null]];
+    $.jqplot('bydate', data, {
+        legend:{
+           renderer: $.jqplot.EnhancedLegendRenderer,
+           show:true
+        },
+        cursor:{
+            show: true,
+            zoom: true
+            },
+        seriesDefaults : {
+            pointLabels: { show: true, location: 'n', edgeTolerance: -15 },
+        },
+        axes:{
+            xaxis:{
+          renderer:$.jqplot.DateAxisRenderer,
+          tickOptions:{formatString:'%Y-%m-%d'},
+          max : new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
+          label : 'When'
+            },
+            yaxis : {
+                label : '# of tasks'
+            }
+        },
+
+        highlighter: {
+          show: true,
+        },
+        series: series
+        }
+    );
+    {{if len(request.args) == 4:}}
+
+    var jgb_whend_series = {{=XML(jgb_whend_series)}};
+    var data = [];
+    var series = [];
+    $.each(jgb_whend_series, function(i, e) {
+            data.push(e['data']);
+            series.push({'label' : e['label'], 'color' : e['color']});
+    });
+    if (data.length == 0) data = [[null]];
+    $.jqplot('bydated', data, {
+        legend:{
+           renderer: $.jqplot.EnhancedLegendRenderer,
+           show:true
+        },
+        cursor:{
+            show: true,
+            zoom: true
+            },
+        seriesDefaults : {
+            pointLabels: { show: true, location: 'n', edgeTolerance: -15 },
+        },
+        axes:{
+            xaxis:{
+                renderer:$.jqplot.DateAxisRenderer,
+                tickOptions:{formatString:'%H:%M'},
+                tickInterval:'3600000',
+                tickRenderer: $.jqplot.CanvasAxisTickRenderer,
+                //tickOptions: {
+                //  angle: -30
+                //},
+                //max : new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
+                label : 'When',
+                //min : "2013-02-22 00:00",
+                //max : "2013-02-23 00:00"
+                //max : max
+            },
+            yaxis : {
+                label : '# of tasks'
+            }
+        },
+
+        highlighter: {
+          show: true,
+        },
+        series: series
+        }
+    );
+
+    {{pass}}
+
+});
+</script>

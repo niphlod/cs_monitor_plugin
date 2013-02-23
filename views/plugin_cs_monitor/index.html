@@ -1,0 +1,16 @@
+{{extend 'layout.html'}}
+
+{{autorefresh = request.vars.autorefresh == '1'}}
+
+{{if autorefresh:}}
+    {{=LOAD('plugin_cs_monitor', 'workers', ajax=True, user_signature=True, target="worker_window", times='Infinity', timeout=3000)}}
+    {{=LOAD('plugin_cs_monitor', 'tasks', ajax=True, user_signature=True, target="tasks_window", times='Infinity', timeout=3500)}}
+{{else:}}
+    {{=LOAD('plugin_cs_monitor', 'workers', ajax=True, user_signature=True, target="worker_window")}}
+    {{=LOAD('plugin_cs_monitor', 'tasks', ajax=True, user_signature=True, target="tasks_window")}}
+{{pass}}
+
+
+
+
+<div id="task_group"></div>

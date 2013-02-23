@@ -1,0 +1,25 @@
+{{extend 'layout.html'}}
+<h1>Workers</h1>
+
+<table class="table table-condensed table-striped">
+	<thead>
+    	<tr>
+            <th></th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Started On</th>
+            <th>Group Names</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{for w_ in w:}}
+        <tr>
+            <td>{{=INPUT(_type="checkbox", _name="w_records", _value=w_.id, value=request.vars.w_records)}}</td>
+            <td>{{=w_.worker_name}}</td>
+            <td>{{=w_.status}}</td>
+            <td>{{=w_.first_heartbeat}}</td>
+            <td>{{=w_.group_names}}</td>
+        </tr>
+        {{pass}}
+    </tbody>
+<table>

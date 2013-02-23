@@ -1,0 +1,6 @@
+{{extend 'layout.html'}}
+
+{{=A("Back to Task Details", _class="btn", _href=URL('task_details', args=request.args(0), user_signature=True))}}
+
+{{=form}}
+
