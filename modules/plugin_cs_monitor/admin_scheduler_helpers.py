@@ -22,7 +22,7 @@ WORKER_STATUS = {'ACTIVE': SPAN("ACTIVE", _class="label label-success"),
 
 def nice_worker_status(status):
     if status in WORKER_STATUS:
-        return WORKER_STATUS[status][1]
+        return WORKER_STATUS[status]
     else:
         return SPAN(status, _class="label")
 

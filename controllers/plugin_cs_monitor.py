@@ -49,7 +49,7 @@ def workers():
     for row in w:
         if row.last_heartbeat < limit:
             row.status_ = nice_worker_status('Probably Dead')
-        row.status_ = nice_worker_status(row.status_)
+        row.status_ = nice_worker_status(row.status)
 
     BASEURL = URL("plugin_cs_monitor", "wactions", user_signature=True)
 
