@@ -2,6 +2,7 @@
 from datetime import timedelta as timed
 import datetime
 from gluon.storage import Storage
+from gluon import current
 from gluon.serializers import json as dumps
 from plugin_cs_monitor.admin_scheduler_helpers import nice_worker_status, graph_colors_task_status, nice_task_status, mybootstrap, requeue_task
 
@@ -17,12 +18,15 @@ response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.
 response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.canvasTextRenderer.min.js'))
 response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.canvasAxisTickRenderer.min.js'))
 
+##Configure start
 sc_cache = cache.ram
-st = db.scheduler_task
-sw = db.scheduler_worker
-sr = db.scheduler_run
-s = scheduler
-dbs = st._db
+##Configure end
+
+s = current._scheduler
+dbs = s.db
+st = dbs.scheduler_task
+sw = dbs.scheduler_worker
+sr = dbs.scheduler_run
 
 response.meta.author = 'Niphlod <niphlod@gmail.com>'
 response.title = 'ComfortScheduler Monitor'
@@ -49,7 +53,8 @@ def workers():
     for row in w:
         if row.last_heartbeat < limit:
             row.status_ = nice_worker_status('Probably Dead')
-        row.status_ = nice_worker_status(row.status)
+        else:
+            row.status_ = nice_worker_status(row.status)
 
     BASEURL = URL("plugin_cs_monitor", "wactions", user_signature=True)
 
@@ -192,7 +197,7 @@ def task_details():
     if not task:
         return ''
     task.status_ = nice_task_status(task.status)
-    return dict(task=task)
+    return dict(task=task, st=st)
 
 @auth.requires_signature()
 def run_details():

@@ -9,29 +9,36 @@ Please try it and report back your findings.
 
 INSTRUCTIONS:
  - download it and merge with your app's code
- - change in controllers/plugin_cs_monitor.py the lines
+ - no cache is used ATM, but I'm planning to use that to avoid db pressure. Change in controllers/plugin_cs_monitor.py the line
     ```python
+    ##Configure start
     sc_cache = cache.ram
-    st = db.scheduler_task
-    sw = db.scheduler_worker
-    sr = db.scheduler_run
-    s = scheduler
+    ##Configure end
     ```
 
-    to match those elements in your codebase (maybe you're running a scheduler in a separate db2, and you named it "myscheduler"), so the code should be
+    to match you preferred cache
     ```python
-    sc_cache = cache.ram
-    st = db2.scheduler_task
-    sw = db2.scheduler_worker
-    sr = db2.scheduler_run
-    s = myscheduler
+    ##Configure start
+    sc_cache = cache.disk
+    ##Configure end
     ```
-
+- the index() function is just a placeholder, every URL is generated with user_signature, so change the permission according to your requirements only in the index() function.
+    ```python
+    @auth.requires_login()
+    def index():
+        return dict()
+    ```
+    e.g to
+    
+    ```python
+    @auth.requires_membership('superadministrators')
+    def index():
+        return dict()
+    ```
+        
 
 TODO:
 - [ ] Groupings can be done in python too, to avoid db pressure
 - [ ] analyze_task works scanning scheduler_run results. It should detect automatically if no runs are there and switch groupings.
 - [ ] add REST interface ?
-
-
 
