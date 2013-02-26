@@ -14,6 +14,7 @@
     </ul>
 </div>
 <button id="workers_autorefresh" type="button" class="btn" data-toggle="button">Auto-Refresh</button>
+<button id="clear_cache" type="button" class="btn">Clear Cache</button>
 
 
 <table id="worker_status" class="table table-condensed table-hover table-bordered">
@@ -65,7 +66,16 @@ $(function() {
     });
     $('#workers_autorefresh').on('click', function(e) {
         newlocation = window.location.search.replace('?autorefresh=1', '') + '?autorefresh=1'
-        $(this).hasClass('active') ? $('#worker_window').addClass('w2p_component_stop') : window.location = window.location.pathname + newlocation;
+        if ($(this).hasClass('active')) {
+            $('#worker_window').addClass('w2p_component_stop');
+            $('#tasks_window').addClass('w2p_component_stop');
+        } else {
+            window.location = window.location.pathname + newlocation;
+        }
+    });
+    $('#clear_cache').on('click', function(e) {
+        e.preventDefault();
+        web2py_ajax_page('post', '{{=URL("clear_cache", user_signature=True)}}', null, 'a');
     });
 });
 </script>

@@ -5,6 +5,7 @@ from gluon.storage import Storage
 from gluon import current
 from gluon.serializers import json as dumps
 from plugin_cs_monitor.admin_scheduler_helpers import nice_worker_status, graph_colors_task_status, nice_task_status, mybootstrap, requeue_task
+from collections import defaultdict
 
 response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/jquery.jqplot.min.js'))
 response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/jquery.jqplot.min.css'))
@@ -20,6 +21,7 @@ response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.
 
 ##Configure start
 sc_cache = cache.ram
+GROUPING_MODE = 'database' # or 'python'
 ##Configure end
 
 s = current._scheduler
@@ -27,6 +29,10 @@ dbs = s.db
 st = dbs.scheduler_task
 sw = dbs.scheduler_worker
 sr = dbs.scheduler_run
+
+ANALYZE_CACHE_TIME = 60
+TASKS_SUMMARY_CACHE_TIME = 60
+ANALYZE_CACHE_KWARGS = {'cache' : (cache.with_prefix(sc_cache, "plugin_cs_monitor"),ANALYZE_CACHE_TIME), 'cacheable' : True}
 
 response.meta.author = 'Niphlod <niphlod@gmail.com>'
 response.title = 'ComfortScheduler Monitor'
@@ -130,13 +136,39 @@ def tactions():
 
     redirect(default)
 
-
 @auth.requires_signature()
 def tasks():
 
     c = cache_tasks_counts(st)
 
     return dict(c=c)
+
+def cache_tasks_counts(t):
+    TASKS_SUMMARY_KWARGS = {'cache' : (cache.with_prefix(sc_cache, "plugin_cs_monitor"),TASKS_SUMMARY_CACHE_TIME), 'cacheable' : True}
+    c = t.id.count()
+
+
+    if GROUPING_MODE == 'python':
+        res = dbs(t.id > 0).select(t.group_name, t.status, orderby=t.group_name|t.status, **TASKS_SUMMARY_KWARGS)
+        rtn = {}
+        for row in res:
+            k = row.group_name
+            s = row.status
+            if k not in rtn:
+                rtn[k] = defaultdict(lambda : { 'count' : 0, 'pretty' : nice_task_status(s)})
+            else:
+                rtn[k][s]['count'] += 1
+    else:
+        res = dbs(t.id > 0).select(c, t.group_name, t.status, groupby=t.group_name|t.status, **TASKS_SUMMARY_KWARGS)
+        rtn = Storage()
+        for row in res:
+            k = row.scheduler_task.group_name
+            s = row.scheduler_task.status
+            if k not in rtn:
+                rtn[k] = {s : { 'count' : row[c], 'pretty' : nice_task_status(s)}}
+            else:
+                rtn[k][s] = { 'count' : row[c], 'pretty' : nice_task_status(s)}
+    return rtn
 
 @auth.requires_signature()
 def task_group():
@@ -176,19 +208,6 @@ def task_group():
 
     BASEURL = URL("plugin_cs_monitor", "tactions", user_signature=True)
     return dict(tasks=tasks, paginate=paginate, total=total, page=page, BASEURL=BASEURL)
-
-def cache_tasks_counts(t):
-    c = t.id.count()
-    res = dbs(t.id > 0).select(c, t.group_name, t.status, groupby=t.group_name|t.status)
-    rtn = Storage()
-    for row in res:
-        k = row.scheduler_task.group_name
-        s = row.scheduler_task.status
-        if k in rtn:
-            rtn[k][s] = { 'count' : row[c], 'pretty' : nice_task_status(s)}
-        else:
-            rtn[k] = {s : { 'count' : row[c], 'pretty' : nice_task_status(s)}}
-    return rtn
 
 @auth.requires_signature()
 def task_details():
@@ -273,19 +292,30 @@ def gb_duration(q):
     status_ = sr.status
     duration_g = sr.stop_time.epoch() - sr.start_time.epoch()
 
-    gb_duration_rows = dbs(q).select(count_, status_, duration_g, groupby=status_|duration_g, orderby=status_|duration_g)
-
-    #convert to duration series
-    gb_duration_series = {}
-    for row in gb_duration_rows:
-        status = row.scheduler_run.status
-        duration = row[duration_g]
-        howmany = row[count_]
-        if status not in gb_duration_series:
-            gb_duration_series[status] = {duration : howmany}
-        else:
-            if duration not in gb_duration_series[status]:
-                gb_duration_series[status][duration] = howmany
+    if GROUPING_MODE == 'python':
+        gb_duration_rows = dbs(q).select(status_, sr.start_time, sr.stop_time, orderby=status_|duration_g)
+        gb_duration_series = {}
+        for row in gb_duration_rows:
+            status = row.status
+            duration_ = row.stop_time - row.start_time
+            duration = (duration_.seconds + duration_.days * 24 * 3600)
+            if status not in gb_duration_series:
+                gb_duration_series[status] = defaultdict(int, {duration : 1})
+            else:
+                gb_duration_series[status][duration] += 1
+    else:
+        gb_duration_rows = dbs(q).select(count_, status_, duration_g, groupby=status_|duration_g, orderby=status_|duration_g)
+        #convert to duration series
+        gb_duration_series = {}
+        for row in gb_duration_rows:
+            status = row.scheduler_run.status
+            duration = row[duration_g]
+            howmany = row[count_]
+            if status not in gb_duration_series:
+                gb_duration_series[status] = {duration : howmany}
+            else:
+                if duration not in gb_duration_series[status]:
+                    gb_duration_series[status][duration] = howmany
 
     jgb_duration_series = []
     for k,v in gb_duration_series.items():
@@ -299,12 +329,20 @@ def gb_status(q):
     #bystatus
     count_ = sr.id.count()
     status_ = sr.status
-    gb_status_rows = dbs(q).select(count_, status_, groupby=status_, orderby=status_)
-    gb_status_series = {}
-    for row in gb_status_rows:
-        status = row.scheduler_run.status
-        howmany = row[count_]
-        gb_status_series[status] = howmany
+
+    if GROUPING_MODE == 'python':
+        gb_status_rows = dbs(q).select(status_, orderby=status_, **ANALYZE_CACHE_KWARGS)
+        gb_status_series = defaultdict(int)
+        for row in gb_status_rows:
+            status = row.status
+            gb_status_series[status] += 1
+    else:
+        gb_status_rows = dbs(q).select(count_, status_, groupby=status_, orderby=status_, **ANALYZE_CACHE_KWARGS)
+        gb_status_series = {}
+        for row in gb_status_rows:
+            status = row.scheduler_run.status
+            howmany = row[count_]
+            gb_status_series[status] = howmany
 
     jgb_status_series = []
     for k,v in gb_status_series.items():
@@ -319,18 +357,29 @@ def bydate(q):
     count_ = sr.id.count()
     status_ = sr.status
     d = sr.start_time.year()|sr.start_time.month()|sr.start_time.day()
-    gb_when_rows = dbs(q).select(count_, status_, sr.start_time.year(), sr.start_time.month(), sr.start_time.day(), groupby=status_|d, orderby=status_|d)
 
-    gb_when_series = {}
-    for row in gb_when_rows:
-        status = row.scheduler_run.status
-        howmany = row[count_]
-        refdate = row[sr.start_time.year()], row[sr.start_time.month()], row[sr.start_time.day()]
-        refdate = datetime.date(*refdate).strftime('%Y-%m-%d')
-        if status not in gb_when_series:
-            gb_when_series[status] = {refdate : howmany}
-        else:
-            gb_when_series[status][refdate] = howmany
+    if GROUPING_MODE == 'python':
+        gb_when_rows = dbs(q).select(status_, sr.start_time, orderby=status_|sr.start_time, **ANALYZE_CACHE_KWARGS)
+        gb_when_series = {}
+        for row in gb_when_rows:
+            status = row.status
+            refdate = row.start_time.strftime('%Y-%m-%d')
+            if status not in gb_when_series:
+                gb_when_series[status] = defaultdict(int, {refdate : 1})
+            else:
+                gb_when_series[status][refdate] += 1
+    else:
+        gb_when_rows = dbs(q).select(count_, status_, sr.start_time.year(), sr.start_time.month(), sr.start_time.day(), groupby=status_|d, orderby=status_|d, **ANALYZE_CACHE_KWARGS)
+        gb_when_series = {}
+        for row in gb_when_rows:
+            status = row.scheduler_run.status
+            howmany = row[count_]
+            refdate = row[sr.start_time.year()], row[sr.start_time.month()], row[sr.start_time.day()]
+            refdate = datetime.date(*refdate).strftime('%Y-%m-%d')
+            if status not in gb_when_series:
+                gb_when_series[status] = {refdate : howmany}
+            else:
+                gb_when_series[status][refdate] = howmany
 
     jgb_when_series = []
     for k, v in gb_when_series.items():
@@ -345,18 +394,29 @@ def byday(q, day):
     count_ = sr.id.count()
     status_ = sr.status
     d = sr.start_time.hour()|sr.start_time.minutes()
-    gb_whend_rows = dbs(q).select(count_, status_, sr.start_time.hour(), sr.start_time.minutes(), groupby=status_|d, orderby=status_|d)
 
-    gb_whend_series = {}
-    for row in gb_whend_rows:
-        status = row.scheduler_run.status
-        howmany = row[count_]
-        refdate = day.year, day.month, day.day, row[sr.start_time.hour()], row[sr.start_time.minutes()], 0
-        refdate = datetime.datetime(*refdate).strftime('%Y-%m-%d %H:%M')
-        if status not in gb_whend_series:
-            gb_whend_series[status] = {refdate : howmany}
-        else:
-            gb_whend_series[status][refdate] = howmany
+    if GROUPING_MODE == 'python':
+        gb_whend_rows = dbs(q).select(status_, sr.start_time, orderby=status_|sr.start_time, **ANALYZE_CACHE_KWARGS)
+        gb_whend_series = {}
+        for row in gb_whend_rows:
+            status = row.status
+            refdate = row.start_time.strftime('%Y-%m-%d %H:%M')
+            if status not in gb_whend_series:
+                gb_whend_series[status] = defaultdict(int, {refdate : 1})
+            else:
+                gb_whend_series[status][refdate] += 1
+    else:
+        gb_whend_rows = dbs(q).select(count_, status_, sr.start_time.hour(), sr.start_time.minutes(), groupby=status_|d, orderby=status_|d, **ANALYZE_CACHE_KWARGS)
+        gb_whend_series = {}
+        for row in gb_whend_rows:
+            status = row.scheduler_run.status
+            howmany = row[count_]
+            refdate = day.year, day.month, day.day, row[sr.start_time.hour()], row[sr.start_time.minutes()], 0
+            refdate = datetime.datetime(*refdate).strftime('%Y-%m-%d %H:%M')
+            if status not in gb_whend_series:
+                gb_whend_series[status] = {refdate : howmany}
+            else:
+                gb_whend_series[status][refdate] = howmany
 
     jgb_whend_series = []
     for k, v in gb_whend_series.items():
@@ -410,4 +470,12 @@ def analyze_task():
         jgb_whend_series = dumps(jgb_whend_series)
     else:
         jgb_whend_series = dumps([[]])
+
     return locals()
+
+
+@auth.requires_signature()
+def clear_cache():
+    sc_cache.clear("plugin_cs_monitor.*")
+    session.flash = 'Cache Cleared'
+    redirect(URL("index"), client_side=True)
