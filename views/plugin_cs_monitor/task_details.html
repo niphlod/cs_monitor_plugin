@@ -11,7 +11,7 @@
 </div>
 
 <table class="task_details table table-condensed table-hover table-bordered">
-    {{fields = [a for a in db.scheduler_task.fields]}}
+    {{fields = [a for a in st.fields]}}
     <tbody>
     {{while len(fields)>0:}}
         <tr>
