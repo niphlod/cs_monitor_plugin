@@ -391,7 +391,8 @@ def analyze_task():
             q = sr.task_id == task_id
     if len(request.args) == 4 and request.args(2) == 'byday':
             daysback = int(request.args(3))
-            day = request.now.date() - timed(days=daysback)
+            now = s.utc_time and request.utcnow or request.now
+            day = now.date() - timed(days=daysback)
             q = q & ((sr.start_time >= day) & (sr.start_time < day + timed(days=1)))
 
     gb_duration_rows, jgb_duration_series = gb_duration(q)
