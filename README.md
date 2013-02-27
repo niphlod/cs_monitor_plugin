@@ -22,7 +22,8 @@ INSTRUCTIONS:
     sc_cache = cache.disk
     ##Configure end
     ```
-- the index() function is just a placeholder, every URL is generated with user_signature, so change the permission according to your requirements only in the index() function.
+- the index() function is just a placeholder, every URL is generated with user_signature, so change the permission according to your requirements only in the index() function. 
+
     ```python
     @auth.requires_login()
     def index():
