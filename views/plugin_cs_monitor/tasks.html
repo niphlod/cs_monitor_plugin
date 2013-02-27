@@ -12,9 +12,14 @@
             <tr>
                 <td rowspan="{{=len(c[group])}}">{{=A(group, _href=URL('task_group', args=group, user_signature=True))}}</td>
                 {{statuses = c[group].keys()}}
-                {{status = statuses.pop()}}
-                <td>{{=A(c[group][status]['pretty'], _href=URL('task_group', args=[group,status], user_signature=True))}}</td>
-                <td>{{=c[group][status]['count']}}</td>
+                {{if statuses:}}
+                    {{status = statuses.pop()}}
+                    <td>{{=A(c[group][status]['pretty'], _href=URL('task_group', args=[group,status], user_signature=True))}}</td>
+                    <td>{{=c[group][status]['count']}}</td>
+                {{else:}}
+                    <td></td>
+                    <td></td>
+                {{pass}}
             </tr>
             {{while len(statuses)>0:}}
                 {{status = statuses.pop()}}

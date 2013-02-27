@@ -31,7 +31,7 @@ sw = dbs.scheduler_worker
 sr = dbs.scheduler_run
 
 ANALYZE_CACHE_TIME = 60
-TASKS_SUMMARY_CACHE_TIME = 60
+TASKS_SUMMARY_CACHE_TIME = 10
 ANALYZE_CACHE_KWARGS = {'cache' : (cache.with_prefix(sc_cache, "plugin_cs_monitor"),ANALYZE_CACHE_TIME), 'cacheable' : True}
 
 response.meta.author = 'Niphlod <niphlod@gmail.com>'
@@ -145,8 +145,6 @@ def tasks():
 
 def cache_tasks_counts(t):
     TASKS_SUMMARY_KWARGS = {'cache' : (cache.with_prefix(sc_cache, "plugin_cs_monitor"),TASKS_SUMMARY_CACHE_TIME), 'cacheable' : True}
-    c = t.id.count()
-
 
     if GROUPING_MODE == 'python':
         res = dbs(t.id > 0).select(t.group_name, t.status, orderby=t.group_name|t.status, **TASKS_SUMMARY_KWARGS)
@@ -156,9 +154,11 @@ def cache_tasks_counts(t):
             s = row.status
             if k not in rtn:
                 rtn[k] = defaultdict(lambda : { 'count' : 0, 'pretty' : nice_task_status(s)})
+                rtn[k][s]['count'] += 1
             else:
                 rtn[k][s]['count'] += 1
     else:
+        c = t.id.count()
         res = dbs(t.id > 0).select(c, t.group_name, t.status, groupby=t.group_name|t.status, **TASKS_SUMMARY_KWARGS)
         rtn = Storage()
         for row in res:
@@ -168,14 +168,15 @@ def cache_tasks_counts(t):
                 rtn[k] = {s : { 'count' : row[c], 'pretty' : nice_task_status(s)}}
             else:
                 rtn[k][s] = { 'count' : row[c], 'pretty' : nice_task_status(s)}
+
     return rtn
 
 @auth.requires_signature()
 def task_group():
-    c = cache_tasks_counts(st)
     group_name, status = request.args(0), request.args(1)
     if not group_name:
         return ''
+    c = cache_tasks_counts(st)
     paginate = 10
     try:
         page = int(request.vars.page or 1)-1
@@ -202,7 +203,7 @@ def task_group():
             parts.append(a.contains(qfilter))
             qf = reduce(lambda a, b: a | b, parts)
         q = q & qf
-    tasks = dbs(q).select(limitby=limitby, orderby=st.next_run_time)
+    tasks = dbs(q).select(limitby=limitby, orderby=~st.next_run_time)
     for row in tasks:
         row.status_ = nice_task_status(row.status)
 
@@ -325,24 +326,40 @@ def gb_duration(q):
 
     return gb_duration_rows, jgb_duration_series
 
-def gb_status(q):
+def gb_status(q, mode='runs'):
     #bystatus
-    count_ = sr.id.count()
-    status_ = sr.status
-
     if GROUPING_MODE == 'python':
-        gb_status_rows = dbs(q).select(status_, orderby=status_, **ANALYZE_CACHE_KWARGS)
-        gb_status_series = defaultdict(int)
-        for row in gb_status_rows:
-            status = row.status
-            gb_status_series[status] += 1
+        if mode == 'runs':
+            gb_status_rows = dbs(q).select(sr.status, orderby=sr.status, **ANALYZE_CACHE_KWARGS)
+            gb_status_series = defaultdict(int)
+            for row in gb_status_rows:
+                status = row.status
+                gb_status_series[status] += 1
+        else:
+            gb_status_series = defaultdict(int)
+            gb_status_rows = dbs(q).select(st.status, st.times_run, **ANALYZE_CACHE_KWARGS)
+            for row in gb_status_rows:
+                gb_status_series[row.status] += row.times_run
     else:
-        gb_status_rows = dbs(q).select(count_, status_, groupby=status_, orderby=status_, **ANALYZE_CACHE_KWARGS)
-        gb_status_series = {}
-        for row in gb_status_rows:
-            status = row.scheduler_run.status
-            howmany = row[count_]
-            gb_status_series[status] = howmany
+        if mode == 'runs':
+            status_ = sr.status
+            count_ = sr.id.count()
+            gb_status_rows = dbs(q).select(count_, status_, groupby=status_, orderby=status_, **ANALYZE_CACHE_KWARGS)
+            gb_status_series = defaultdict(int)
+            for row in gb_status_rows:
+                status = row.scheduler_run.status
+                howmany = row[count_]
+                gb_status_series[status] += howmany
+        else:
+            status_ = st.status
+            count_ = st.times_run.sum()
+            gb_status_rows = dbs(q).select(count_, status_, groupby=status_, orderby=status_, **ANALYZE_CACHE_KWARGS)
+            gb_status_series = defaultdict(int)
+            for row in gb_status_rows:
+                status = row.scheduler_task.status
+                howmany = row[count_]
+                gb_status_series[status] += howmany
+
 
     jgb_status_series = []
     for k,v in gb_status_series.items():
@@ -352,34 +369,59 @@ def gb_status(q):
 
     return gb_status_rows, jgb_status_series
 
-def bydate(q):
+def bydate(q, mode):
     #by period
-    count_ = sr.id.count()
-    status_ = sr.status
-    d = sr.start_time.year()|sr.start_time.month()|sr.start_time.day()
 
     if GROUPING_MODE == 'python':
-        gb_when_rows = dbs(q).select(status_, sr.start_time, orderby=status_|sr.start_time, **ANALYZE_CACHE_KWARGS)
-        gb_when_series = {}
-        for row in gb_when_rows:
-            status = row.status
-            refdate = row.start_time.strftime('%Y-%m-%d')
-            if status not in gb_when_series:
-                gb_when_series[status] = defaultdict(int, {refdate : 1})
-            else:
-                gb_when_series[status][refdate] += 1
+        if mode == 'runs':
+            gb_when_rows = dbs(q).select(sr.status, sr.start_time, orderby=sr.status|sr.start_time, **ANALYZE_CACHE_KWARGS)
+            gb_when_series = {}
+            for row in gb_when_rows:
+                refdate = row.start_time.strftime('%Y-%m-%d')
+                if status not in gb_when_series:
+                    gb_when_series[row.status] = defaultdict(int, {refdate : 1})
+                else:
+                    gb_when_series[row.status][refdate] += 1
+        else:
+            gb_when_rows = dbs(q).select(st.status, st.times_run, st.last_run_time, orderby=st.status|st.last_run_time, **ANALYZE_CACHE_KWARGS)
+            gb_when_series = {}
+            for row in gb_when_rows:
+                refdate = row.last_run_time.strftime('%Y-%m-%d')
+                if row.status not in gb_when_series:
+                    gb_when_series[row.status] = defaultdict(int, {refdate : 1})
+                else:
+                    gb_when_series[row.status][refdate] += row.times_run
     else:
-        gb_when_rows = dbs(q).select(count_, status_, sr.start_time.year(), sr.start_time.month(), sr.start_time.day(), groupby=status_|d, orderby=status_|d, **ANALYZE_CACHE_KWARGS)
-        gb_when_series = {}
-        for row in gb_when_rows:
-            status = row.scheduler_run.status
-            howmany = row[count_]
-            refdate = row[sr.start_time.year()], row[sr.start_time.month()], row[sr.start_time.day()]
-            refdate = datetime.date(*refdate).strftime('%Y-%m-%d')
-            if status not in gb_when_series:
-                gb_when_series[status] = {refdate : howmany}
-            else:
-                gb_when_series[status][refdate] = howmany
+        if mode == 'runs':
+            count_ = sr.id.count()
+            status_ = sr.status
+            d = sr.start_time.year()|sr.start_time.month()|sr.start_time.day()
+            gb_when_rows = dbs(q).select(count_, status_, sr.start_time.year(), sr.start_time.month(), sr.start_time.day(), groupby=status_|d, orderby=status_|d, **ANALYZE_CACHE_KWARGS)
+            gb_when_series = {}
+            for row in gb_when_rows:
+                status = row.scheduler_run.status
+                howmany = row[count_]
+                refdate = row[sr.start_time.year()], row[sr.start_time.month()], row[sr.start_time.day()]
+                refdate = datetime.date(*refdate).strftime('%Y-%m-%d')
+                if status not in gb_when_series:
+                    gb_when_series[status] = {refdate : howmany}
+                else:
+                    gb_when_series[status][refdate] = howmany
+        else:
+            count_ = st.times_run.sum()
+            status_ = st.status
+            d = st.last_run_time.year()|st.last_run_time.month()|st.last_run_time.day()
+            gb_when_rows = dbs(q).select(count_, status_, st.last_run_time.year(), st.last_run_time.month(), st.last_run_time.day(), groupby=status_|d, orderby=status_|d, **ANALYZE_CACHE_KWARGS)
+            gb_when_series = {}
+            for row in gb_when_rows:
+                status = row.scheduler_task.status
+                howmany = row[count_]
+                refdate = row[st.last_run_time.year()], row[st.last_run_time.month()], row[st.last_run_time.day()]
+                refdate = datetime.date(*refdate).strftime('%Y-%m-%d')
+                if status not in gb_when_series:
+                    gb_when_series[status] = {refdate : howmany}
+                else:
+                    gb_when_series[status][refdate] = howmany
 
     jgb_when_series = []
     for k, v in gb_when_series.items():
@@ -389,34 +431,60 @@ def bydate(q):
 
     return gb_when_rows, jgb_when_series
 
-def byday(q, day):
+def byday(q, day, mode):
     #by period
-    count_ = sr.id.count()
-    status_ = sr.status
-    d = sr.start_time.hour()|sr.start_time.minutes()
-
     if GROUPING_MODE == 'python':
-        gb_whend_rows = dbs(q).select(status_, sr.start_time, orderby=status_|sr.start_time, **ANALYZE_CACHE_KWARGS)
-        gb_whend_series = {}
-        for row in gb_whend_rows:
-            status = row.status
-            refdate = row.start_time.strftime('%Y-%m-%d %H:%M')
-            if status not in gb_whend_series:
-                gb_whend_series[status] = defaultdict(int, {refdate : 1})
-            else:
-                gb_whend_series[status][refdate] += 1
+        if mode == 'runs':
+            gb_whend_rows = dbs(q).select(sr.status, sr.start_time, orderby=sr.status|sr.start_time, **ANALYZE_CACHE_KWARGS)
+            gb_whend_series = {}
+            for row in gb_whend_rows:
+                status = row.status
+                refdate = row.start_time.strftime('%Y-%m-%d %H:%M')
+                if status not in gb_whend_series:
+                    gb_whend_series[status] = defaultdict(int, {refdate : 1})
+                else:
+                    gb_whend_series[status][refdate] += 1
+        else:
+            gb_whend_rows = dbs(q).select(st.times_run, st.status, st.last_run_time, orderby=st.status|st.last_run_time, **ANALYZE_CACHE_KWARGS)
+            gb_whend_series = {}
+            for row in gb_whend_rows:
+                status = row.status
+                refdate = row.last_run_time.strftime('%Y-%m-%d %H:%M')
+                if status not in gb_whend_series:
+                    gb_whend_series[status] = defaultdict(int, {refdate : row.times_run})
+                else:
+                    gb_whend_series[status][refdate] += row.times_run
     else:
-        gb_whend_rows = dbs(q).select(count_, status_, sr.start_time.hour(), sr.start_time.minutes(), groupby=status_|d, orderby=status_|d, **ANALYZE_CACHE_KWARGS)
-        gb_whend_series = {}
-        for row in gb_whend_rows:
-            status = row.scheduler_run.status
-            howmany = row[count_]
-            refdate = day.year, day.month, day.day, row[sr.start_time.hour()], row[sr.start_time.minutes()], 0
-            refdate = datetime.datetime(*refdate).strftime('%Y-%m-%d %H:%M')
-            if status not in gb_whend_series:
-                gb_whend_series[status] = {refdate : howmany}
-            else:
-                gb_whend_series[status][refdate] = howmany
+        if mode == 'runs':
+            count_ = sr.id.count()
+            status_ = sr.status
+            d = sr.start_time.hour()|sr.start_time.minutes()
+            gb_whend_rows = dbs(q).select(count_, status_, sr.start_time.hour(), sr.start_time.minutes(), groupby=status_|d, orderby=status_|d, **ANALYZE_CACHE_KWARGS)
+            gb_whend_series = {}
+            for row in gb_whend_rows:
+                status = row.scheduler_run.status
+                howmany = row[count_]
+                refdate = day.year, day.month, day.day, row[sr.start_time.hour()], row[sr.start_time.minutes()], 0
+                refdate = datetime.datetime(*refdate).strftime('%Y-%m-%d %H:%M')
+                if status not in gb_whend_series:
+                    gb_whend_series[status] = {refdate : howmany}
+                else:
+                    gb_whend_series[status][refdate] = howmany
+        else:
+            count_ = st.times_run.sum()
+            status_ = st.status
+            d = st.last_run_time.hour()|st.last_run_time.minutes()
+            gb_whend_rows = dbs(q).select(count_, status_, st.last_run_time.hour(), st.last_run_time.minutes(), groupby=status_|d, orderby=status_|d, **ANALYZE_CACHE_KWARGS)
+            gb_whend_series = {}
+            for row in gb_whend_rows:
+                status = row.scheduler_task.status
+                howmany = row[count_]
+                refdate = day.year, day.month, day.day, row[st.last_run_time.hour()], row[st.last_run_time.minutes()], 0
+                refdate = datetime.datetime(*refdate).strftime('%Y-%m-%d %H:%M')
+                if status not in gb_whend_series:
+                    gb_whend_series[status] = {refdate : howmany}
+                else:
+                    gb_whend_series[status][refdate] = howmany
 
     jgb_whend_series = []
     for k, v in gb_whend_series.items():
@@ -438,35 +506,59 @@ def analyze_task():
         return ''
 
     q = sr.task_id == task_id
+
     first_run = dbs(q).select(sr.start_time, orderby=sr.start_time, limitby=(0,1)).first()
 
     last_run = dbs(q).select(sr.start_time, orderby=~sr.start_time, limitby=(0,1)).first()
 
+    if not first_run:
+        mode = 'no_runs'
+        #we can rely on the data on the scheduler_task table because no scheduler_run were found
+        q = st.id == task_id
+    else:
+        mode = 'runs'
     if len(request.args) >= 2:
         if request.args(1) == 'byfunction':
-            q = sr.task_id.belongs(dbs(st.function_name == task.function_name)._select(st.id))
+            if mode == 'runs':
+                q = sr.task_id.belongs(dbs(st.function_name == task.function_name)._select(st.id))
+            else:
+                q = st.function_name == task.function_name
         elif request.args(1) == 'bytaskname':
-            q = sr.task_id.belongs(dbs(st.task_name == task.task_name)._select(st.id))
+            if mode == 'runs':
+                q = sr.task_id.belongs(dbs(st.task_name == task.task_name)._select(st.id))
+            else:
+                q = st.task_name == task.task_name
         elif request.args(1) == 'this':
-            q = sr.task_id == task_id
+            if mode == 'runs':
+                q = sr.task_id == task_id
+            else:
+                q = st.id == task_id
+
     if len(request.args) == 4 and request.args(2) == 'byday':
             daysback = int(request.args(3))
             now = s.utc_time and request.utcnow or request.now
             day = now.date() - timed(days=daysback)
-            q = q & ((sr.start_time >= day) & (sr.start_time < day + timed(days=1)))
+            if mode == 'runs':
+                q = q & ((sr.start_time >= day) & (sr.start_time < day + timed(days=1)))
+            else:
+                q = q & ((st.last_run_time >= day) & (st.last_run_time < day + timed(days=1)))
 
-    gb_duration_rows, jgb_duration_series = gb_duration(q)
-    jgb_duration_series = dumps(jgb_duration_series)
+    if mode == 'runs':
+        gb_duration_rows, jgb_duration_series = gb_duration(q)
+        jgb_duration_series = dumps(jgb_duration_series)
+    else:
+        #no duration can be calculated using the scheduler_task table only
+        jgb_duration_series = dumps([])
 
-    gb_status_rows, jgb_status_series = gb_status(q)
+    gb_status_rows, jgb_status_series = gb_status(q, mode)
     jgb_status_series = dumps(jgb_status_series)
 
-    gb_when_rows, jgb_when_series = bydate(q)
+    gb_when_rows, jgb_when_series = bydate(q, mode)
     jgb_when_series = dumps(jgb_when_series)
 
 
     if len(request.args) == 4 and request.args(2) == 'byday':
-        gb_whend_rows, jgb_whend_series = byday(q, day)
+        gb_whend_rows, jgb_whend_series = byday(q, day, mode)
         jgb_whend_series = dumps(jgb_whend_series)
     else:
         jgb_whend_series = dumps([[]])
