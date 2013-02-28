@@ -36,8 +36,8 @@ ANALYZE_CACHE_KWARGS = {'cache' : (cache.with_prefix(sc_cache, "plugin_cs_monito
 
 response.meta.author = 'Niphlod <niphlod@gmail.com>'
 response.title = 'ComfortScheduler Monitor'
-response.subtitle = '0.0.1'
-response.static_version = '0.0.1'
+response.subtitle = '0.1.0'
+response.static_version = '0.1.0'
 
 try:
     response.menu.append(
@@ -571,3 +571,31 @@ def clear_cache():
     sc_cache.clear("plugin_cs_monitor.*")
     session.flash = 'Cache Cleared'
     redirect(URL("index"), client_side=True)
+
+@auth.requires_signature()
+def delete_tasks():
+    period = request.args(0)
+    if not period in ['1d', '3d', '1w', '1m', '3m']:
+        return ''
+    now = s.utc_time and request.utcnow or request.now
+    if period == '1d':
+        limit = timed(days=1)
+    elif period == '3d':
+        limit = timed(days=3)
+    elif period == '1w':
+        limit = timed(days=7)
+    elif period == '1m':
+        limit = timed(days=30)
+    elif period == '3m':
+        limit = timed(days=90)
+    limit = now - limit
+    if request.vars.confirm == '1':
+        statuses = ['COMPLETED', 'FAILED', 'EXPIRED', 'STOPPED']
+        dbs(
+            (st.status.belongs(statuses)) &
+            (st.start_time < limit)
+             ).delete()
+        sc_cache.clear("plugin_cs_monitor.*")
+        redirect(URL('index'))
+    limit = limit.strftime('%Y-%m-%d %H:%M:%S')
+    return dict(limit=limit)

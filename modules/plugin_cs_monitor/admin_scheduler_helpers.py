@@ -13,11 +13,12 @@ TASK_STATUS = {
         'ASSIGNED' : ('#FAA732', SPAN('ASSIGNED', _class="label label-warning")),
         }
 
-WORKER_STATUS = {'ACTIVE': SPAN("ACTIVE", _class="label label-success"),
-                     'PICK': SPAN("PICK", _class="label label-info"),
-                     'DISABLED': SPAN("DISABLED", _class="label label-warning"),
-                     'TERMINATE': SPAN("TERMINATE", _class="label label-important"),
-                     'KILL': SPAN("KILL", _class="label label-important")
+WORKER_STATUS = {
+        'ACTIVE': SPAN("ACTIVE", _class="label label-success"),
+        'PICK': SPAN("PICK", _class="label label-info"),
+        'DISABLED': SPAN("DISABLED", _class="label label-warning"),
+        'TERMINATE': SPAN("TERMINATE", _class="label label-important"),
+        'KILL': SPAN("KILL", _class="label label-important")
     }
 
 def nice_worker_status(status):
