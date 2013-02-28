@@ -22,6 +22,8 @@ response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.
 ##Configure start
 sc_cache = cache.ram
 GROUPING_MODE = 'database' # or 'python'
+ANALYZE_CACHE_TIME = 60
+TASKS_SUMMARY_CACHE_TIME = 10
 ##Configure end
 
 s = current._scheduler
@@ -30,8 +32,7 @@ st = dbs.scheduler_task
 sw = dbs.scheduler_worker
 sr = dbs.scheduler_run
 
-ANALYZE_CACHE_TIME = 60
-TASKS_SUMMARY_CACHE_TIME = 10
+
 ANALYZE_CACHE_KWARGS = {'cache' : (cache.with_prefix(sc_cache, "plugin_cs_monitor"),ANALYZE_CACHE_TIME), 'cacheable' : True}
 
 response.meta.author = 'Niphlod <niphlod@gmail.com>'
