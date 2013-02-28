@@ -11,16 +11,18 @@ INSTRUCTIONS:
  - download it and merge with your app's code
  - no cache is used ATM, but I'm planning to use that to avoid db pressure. Change in controllers/plugin_cs_monitor.py the line
     ```python
-    ##Configure start
     sc_cache = cache.ram
-    ##Configure end
+    GROUPING_MODE = 'database' # or 'python'
+    ANALYZE_CACHE_TIME = 60
+    TASKS_SUMMARY_CACHE_TIME = 10
     ```
 
-    to match you preferred cache
+    to match your preferences
     ```python
-    ##Configure start
-    sc_cache = cache.disk
-    ##Configure end
+    sc_cache = cache.ram #your cache backend
+    GROUPING_MODE = 'database' # or 'python', to save the db from some heavy queries
+    ANALYZE_CACHE_TIME = 60 #how many seconds cache the queries done to analyze the task
+    TASKS_SUMMARY_CACHE_TIME = 10 #how many seconds cache the queries for the task summary on the index page
     ```
 - the index() function is just a placeholder, every URL is generated with user_signature, so change the permission according to your requirements only in the index() function. 
 
@@ -39,7 +41,7 @@ INSTRUCTIONS:
         
 
 TODO:
-- [ ] Groupings can be done in python too, to avoid db pressure
-- [ ] analyze_task works scanning scheduler_run results. It should detect automatically if no runs are there and switch groupings.
+- [x] Groupings can be done in python too, to avoid db pressure
+- [x] analyze_task works scanning scheduler_run results. It should detect automatically if no runs are there and switch groupings.
 - [ ] add REST interface ?
 
