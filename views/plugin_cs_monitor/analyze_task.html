@@ -4,24 +4,29 @@
 
 <div class="row">
     <div class="span4">
-        {{if first_run:}}
-            <span>First Run: {{=prettydate(first_run.start_time)}}</span>
-            <span>Last Run: {{=prettydate(last_run.start_time)}}</span>
-        {{pass}}
-        <div class="btn-group btn-group-vertical">
-
-        {{=A('Just this task : %s' % (task.uuid), _class="btn", _href=URL(args=request.args(0), user_signature=True))}}
-        {{=A('All tasks by function name : %s' % (task.function_name), _class="btn", _href=URL(args=(request.args(0), 'byfunction'), user_signature=True))}}
-        {{=A('All tasks by task name name : %s' % (task.task_name), _class="btn", _href=URL(args=(request.args(0), 'bytaskname'), user_signature=True))}}
-        {{args = request.args}}
-        {{if len(args) == 1:}}
-            {{=A('Just today', _class="btn", _href=URL(args=(request.args(0), 'this', 'bydate', 0), user_signature=True))}}
-        {{elif len(args) == 2:}}
-            {{=A('Just today', _class="btn", _href=URL(args=(request.args(0), request.args(1), 'byday', 0), user_signature=True))}}
-        {{elif len(args) == 4:}}
-            {{=A('Previous Day', _class="btn", _href=URL(args=(request.args(0), request.args(1), 'byday', int(request.args(3)) + 1), user_signature=True))}}
-            {{=A('Next Day', _class="btn", _href=URL(args=(request.args(0), request.args(1), 'byday', int(request.args(3)) - 1), user_signature=True))}}
-        {{pass}}
+        <div class="well" style="padding: 8px 0;">
+        <ul class="nav nav-list">
+            {{if first_run:}}
+                <li class="nav-header">Run Details</li>
+                <li>First Run: {{=prettydate(first_run.start_time)}}</li>
+                <li>Last Run: {{=prettydate(last_run.start_time)}}</li>
+                <li class="divider"></li>
+            {{pass}}
+            <li class="nav-header">Analyze</li>
+            <li>{{=A('Just this task : %s' % (task.uuid), _href=URL(args=request.args(0), user_signature=True))}}</li>
+            <li>{{=A('All tasks by function name : %s' % (task.function_name), _href=URL(args=(request.args(0), 'byfunction'), user_signature=True))}}</li>
+            <li>{{=A('All tasks by task name name : %s' % (task.task_name), _href=URL(args=(request.args(0), 'bytaskname'), user_signature=True))}}</li>
+            <li class="divider"></li>
+            <li class="nav-header">Timeframe</li>
+            {{if len(request.args) == 1:}}
+                <li>{{=A('Just today', _href=URL(args=(request.args(0), 'this', 'bydate', 0), user_signature=True))}}</li>
+            {{elif len(request.args) == 2:}}
+                <li>{{=A('Just today', _href=URL(args=(request.args(0), request.args(1), 'byday', 0), user_signature=True))}}</li>
+            {{elif len(request.args) == 4:}}
+                <li>{{=A('Previous Day', _href=URL(args=(request.args(0), request.args(1), 'byday', int(request.args(3)) + 1), user_signature=True))}}</li>
+                <li>{{=A('Next Day', _href=URL(args=(request.args(0), request.args(1), 'byday', int(request.args(3)) - 1), user_signature=True))}}</li>
+            {{pass}}
+        </ul>
         </div>
     </div>
     <div class="span4 offset4">
@@ -29,7 +34,7 @@
         <div id="bystatus"></div>
     </div>
 </div>
-{{if len(args) == 4:}}
+{{if len(request.args) == 4:}}
 <div class="row">
     <h4>Single Day</h4>
     <div id="bydated"></div>
