@@ -379,7 +379,7 @@ def bydate(q, mode):
             gb_when_series = {}
             for row in gb_when_rows:
                 refdate = row.start_time.strftime('%Y-%m-%d')
-                if status not in gb_when_series:
+                if row.status not in gb_when_series:
                     gb_when_series[row.status] = defaultdict(int, {refdate : 1})
                 else:
                     gb_when_series[row.status][refdate] += 1
