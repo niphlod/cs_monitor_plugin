@@ -134,6 +134,17 @@ def tactions():
             session.flash = "%s tasks successfully requeued" % (len(requeued))
         else:
             session.flash = "Cloning failed"
+    elif action == 'stop':
+        stopped = []
+        tasks = dbs(st.id.belongs(t)).select()
+        for row in tasks:
+            res = s.stop_task(row.id)
+            if res == 1:
+                stopped.append(res)
+        if stopped:
+            session.flash = "%s tasks successfully stopped" % (len(stopped))
+        else:
+            session.flash = "Stopping failed"
 
     redirect(default)
 
@@ -268,6 +279,13 @@ def edit_task():
         task.delete_record()
         session.flash = 'Task deleted correctly'
         redirect(URL('index'))
+    elif request.args(1) == 'stop':
+        rtn = s.stop_task(task.id)
+        if rtn == 1:
+            session.flash = 'Task stopped'
+        else:
+            session.flash = 'Nothing to do...'
+        redirect(URL('task_details', args=task.id, user_signature=True))
     elif request.args(1) == 'clone':
         result = requeue_task(st, task)
         if result:
