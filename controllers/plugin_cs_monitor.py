@@ -270,10 +270,15 @@ def run_traceback():
 @auth.requires_signature()
 def edit_task():
     task_id = request.args(0)
-    if not task_id:
+    if task_id is None:
+        return ''
+    try:
+        task_id = int(task_id)
+    except:
         return ''
     task = dbs(st.id == task_id).select().first()
-    if not task:
+
+    if not task and task_id != 0:
         return ''
     if request.args(1) == 'delete':
         task.delete_record()
@@ -295,13 +300,17 @@ def edit_task():
             session.flash = 'Task clone failed'
             redirect(URL('edit_task', args=task_id, user_signature=True))
     elif request.args(1) == 'new':
-        st.function_name.default = task.function_name
-        st.task_name.default = task.task_name
-        st.group_name.default = task.group_name
+        if task_id != 0:
+            st.function_name.default = task.function_name
+            st.task_name.default = task.task_name
+            st.group_name.default = task.group_name
         task = None
     form = SQLFORM(st, task, formstyle=mybootstrap)
     if form.process().accepted:
-        response.flash = 'Updated correctly'
+        if request.args(1) == 'new':
+            response.flash = 'Task created correctly'
+        else:
+            response.flash = 'Updated correctly'
     elif form.errors:
         response.flash = 'Errors detected'
     return dict(form=form, task=task)
