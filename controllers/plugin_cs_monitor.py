@@ -18,6 +18,7 @@ response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.
 response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.highlighter.min.js'))
 response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.canvasTextRenderer.min.js'))
 response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.canvasAxisTickRenderer.min.js'))
+response.files.append(URL('static', 'plugin_cs_monitor/js/stupidtable/stupidtable.min.js'))
 
 ##Configure start
 sc_cache = cache.ram
