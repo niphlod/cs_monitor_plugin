@@ -286,7 +286,7 @@ def edit_task():
         session.flash = 'Task deleted correctly'
         redirect(URL('index'))
     elif request.args(1) == 'stop':
-        rtn = s.stop_task(task.id)
+        rtn = s.stop_task(task_id)
         if rtn == 1:
             session.flash = 'Task stopped'
         else:
