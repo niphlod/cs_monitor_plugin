@@ -102,9 +102,20 @@ def requeue_task(st, orig_task):
     FCOPY = ['task_name', 'group_name', 'function_name',
              'args', 'vars', 'enabled', 'start_time',
              'stop_time', 'repeats', 'retry_failed',
-             'period', 'timeout', 'sync_output']
+             'period', 'timeout', 'sync_output',
+             'application_name']
+
+    # accomodate for prevent_drift ("backward compatibility")
+    if 'prevent_drift' in st.fields:
+        FCOPY.append('prevent_drift')
 
     new_task = {}
+    # https://github.com/niphlod/cs_monitor_plugin/issues/9
+    # if a task is STOPPED, we need to "reset" stop_time and enabled
+    if orig_task.status == 'STOPPED':
+        FCOPY.remove('stop_time')
+        FCOPY.remove('enabled')
+
     for f in FCOPY:
         new_task[f] = orig_task[f]
     orig_uuid = orig_task.uuid
