@@ -39,8 +39,8 @@ ANALYZE_CACHE_KWARGS = {'cache' : (cache.with_prefix(sc_cache, "plugin_cs_monito
 
 response.meta.author = 'Niphlod <niphlod@gmail.com>'
 response.title = 'ComfortScheduler Monitor'
-response.subtitle = '1.2.0'
-response.static_version = '1.2.0'
+response.subtitle = '1.2.1'
+response.static_version = '1.2.1'
 
 try:
     response.menu.append(
