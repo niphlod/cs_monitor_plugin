@@ -98,7 +98,7 @@ def mybootstrap(form, fields):
     parent.append(script)
     return parent
 
-def requeue_task(st, orig_task):
+def requeue_task(st, orig_task, clone=True):
     FCOPY = ['task_name', 'group_name', 'function_name',
              'args', 'vars', 'enabled', 'start_time',
              'stop_time', 'repeats', 'retry_failed',
@@ -119,10 +119,18 @@ def requeue_task(st, orig_task):
     for f in FCOPY:
         new_task[f] = orig_task[f]
     orig_uuid = orig_task.uuid
-    orig_uuid = orig_uuid[:orig_uuid.rfind(':req_at:')]
-    new_task['uuid'] = '%s:req_at:%s' % (orig_uuid, int(time.mktime(datetime.datetime.utcnow().timetuple())))
-    rtn = st.validate_and_insert(**new_task)
-    if not rtn.errors:
-        return rtn.id
+    if clone:
+        orig_uuid = orig_uuid[:orig_uuid.rfind(':req_at:')]
+        new_task['uuid'] = '%s:req_at:%s' % (orig_uuid, int(time.mktime(datetime.datetime.utcnow().timetuple())))
+        rtn = st.validate_and_insert(**new_task)
+        if not rtn.errors:
+            return rtn.id
+        else:
+            return None
     else:
-        return None
+        new_task['status'] = 'QUEUED'
+        rtn = st.validate_and_update(st.uuid == orig_uuid, **new_task)
+        if not rtn.errors:
+            return orig_task.id
+        else:
+            return None

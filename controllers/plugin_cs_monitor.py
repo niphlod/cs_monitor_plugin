@@ -1,4 +1,4 @@
-# coding: utf8
+ # coding: utf8
 from datetime import timedelta as timed
 import datetime
 from gluon.storage import Storage
@@ -312,6 +312,14 @@ def edit_task():
             st.function_name.default = task.function_name
             st.task_name.default = task.task_name
             st.group_name.default = task.group_name
+    elif request.args(1) == 'requeue':
+        result = requeue_task(st, task, clone=False)
+        if result:
+            session.flash = 'Task requeued correctly'
+            redirect(URL('task_details', args=result, user_signature=True))
+        else:
+            session.flash = 'Task requeue failed'
+            redirect(URL('edit_task', args=task_id, user_signature=True))
         task = None
     form = SQLFORM(st, task, formstyle=mybootstrap)
     if form.process().accepted:

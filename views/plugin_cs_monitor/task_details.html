@@ -7,7 +7,11 @@
     {{=A("Edit", _class="btn btn-info", _href=URL('edit_task', args=task.id, user_signature=True))}}
     {{=A("Clone and Requeue", _class="btn btn-warning", _href=URL('edit_task', args=[task.id, 'clone'], user_signature=True))}}
     {{=A("Delete", _class="btn btn-danger", _href=URL('edit_task', args=[task.id, 'delete'], user_signature=True))}}
-    {{=A("Stop Task", _class="btn btn-danger", _href=URL('edit_task', args=[task.id, 'stop'], user_signature=True))}}
+    {{if task.status != 'STOPPED':}}
+        {{=A("Stop Task", _class="btn btn-danger", _href=URL('edit_task', args=[task.id, 'stop'], user_signature=True))}}
+    {{else:}}
+        {{=A("Requeue", _class="btn btn-danger", _href=URL('edit_task', args=[task.id, 'requeue'], user_signature=True))}}
+    {{pass}}
     {{=A("Analyze", _class="btn btn-primary", _href=URL('analyze_task', args=task.id, user_signature=True))}}
 </div>
 
