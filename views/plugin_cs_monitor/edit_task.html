@@ -1,8 +1,8 @@
-{{extend 'layout.html'}}
+{{extend 'plugin_cs_monitor/layout.html'}}
 
 {{if request.args(0) == '0':}}
-    {{=A("Back to Index", _class="btn", _href=URL('index', user_signature=True))}}
+    {{=A("Back to Index", _class="btn btn-default", _href=URL('index', user_signature=True), data=dict(instant=''))}}
 {{else:}}
-    {{=A("Back to Task Details", _class="btn", _href=URL('task_details', args=request.args(0), user_signature=True))}}
+    {{=A("Back to Task Details", _class="btn btn-default", _href=URL('task_details', args=request.args(0), user_signature=True), data=dict(instant=''))}}
 {{pass}}
 {{=form}}

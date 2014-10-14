@@ -1,70 +1,82 @@
 
-<div class="input-append">
-    <input class="span2" id="qfilter" type="text" name="qfilter">
-    <button id="qfilter_submit" class="btn" type="button">Search</button>
+<div class="panel panel-primary">
+    <div class="panel-heading">
+        <h3 class="panel-title">Run Details</h3>
+    </div>
+    <div class="panel-body">
+        <div class="btn-toolbar">
+            <div class="btn-group">
+                <div class="input-group">
+                  <input id="qfilter" name="qfilter" type="text" class="form-control" placeholder="{{=request.vars.qfilter}}">
+                  <span class="input-group-btn">
+                    <button id="qfilter_submit" class="btn btn-default" type="button">Search</button>
+                  </span>
+                </div>
+            </div>
+            <div class="btn-group">
+                <button id="qclear" class="btn btn-warning">Clear Search</button>
+            </div>
+        </div>
+
+        <table id="run_details" class="table table-condensed table-hover">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th data-sort="string">Task id</th>
+                    <th data-sort="string">Status</th>
+                    <th data-sort="string">Start Time</th>
+                    <th data-sort="string">Stop Time</th>
+                    <th data-sort="int">Elapsed secs</th>
+                    <th data-sort="string">Output</th>
+                    <th data-sort="string">Result</th>
+                    <th data-sort="string">Traceback</th>
+                    <th data-sort="string">Worker Name</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{for r_ in runs:}}
+                <tr>
+                    <td>{{=INPUT(_type="checkbox", _name="r_records", _value=r_.id, value=request.vars.r_records)}}</td>
+                    <td>{{=r_.task_id}}</td>
+                    <td>{{=r_.status_}}</td>
+                    <td>{{=r_.start_time}}</td>
+                    <td>{{=r_.stop_time}}</td>
+                    <td>{{=r_.elapsed_seconds_}}</td>
+                    <td>{{=r_.run_output}}</td>
+                    <td>{{=r_.run_result}}</td>
+                    {{traceback = r_.traceback}}
+                    {{if traceback:}}
+                    <td>{{=A("Details...", _href=URL('run_traceback', args=r_.id, user_signature=True), _class="traceback", _id="run_%s" % r_.id, **{'_data-toggle' : 'modal', '_data-target': '#task_traceback'})}}</td>
+                    {{else:}}
+                    <td></td>
+                    {{pass}}
+                    <td>{{=r_.worker_name}}</td>
+                </tr>
+                {{pass}}
+            </tbody>
+        </table>
+
+        {{if total > len(runs):}}
+        <ul class="pager">
+            {{prev = page and URL(r=request, args=request.args, vars={'page': page and page or 1, 'qfilter':request.vars.qfilter or ''}, user_signature=True) or '#'}}
+            {{prev = prev != '#' and A('Previous', _href=prev, cid=request.cid) or A('Previous', _href='#')}}
+            {{next = total/paginate > page and URL(r=request, args=request.args, vars={'page' : page and page+2 or 2, 'qfilter':request.vars.qfilter or ''}, user_signature=True) or '#'}}
+            {{next = next != '#' and A('Next', _href=next, cid=request.cid) or A('Next', _href='#')}}
+            <li class="{{='' if page else 'disabled'}}">{{=prev}}</li>
+            <li>{{=A(page+1)}}</li>
+            <li class="{{='' if total/paginate > page else 'disabled'}}">{{=next}}</li>
+        </ul>
+        {{pass}}
+    </div>
 </div>
 
-<table id="run_details" class="table table-condensed table-hover table-bordered">
-    <thead>
-        <tr>
-            <th></th>
-            <th data-sort="string">Task id</th>
-            <th data-sort="string">Status</th>
-            <th data-sort="string">Start Time</th>
-            <th data-sort="string">Stop Time</th>
-            <th data-sort="int">Elapsed secs</th>
-            <th data-sort="string">Output</th>
-            <th data-sort="string">Result</th>
-            <th data-sort="string">Traceback</th>
-            <th data-sort="string">Worker Name</th>
-        </tr>
-    </thead>
-    <tbody>
-        {{for r_ in runs:}}
-        <tr>
-            <td>{{=INPUT(_type="checkbox", _name="r_records", _value=r_.id, value=request.vars.r_records)}}</td>
-            <td>{{=r_.task_id}}</td>
-            <td>{{=r_.status_}}</td>
-            <td>{{=r_.start_time}}</td>
-            <td>{{=r_.stop_time}}</td>
-            <td>{{=r_.elapsed_seconds_}}</td>
-            <td>{{=r_.run_output}}</td>
-            <td>{{=r_.run_result}}</td>
-            {{traceback = r_.traceback}}
-            {{if traceback:}}
-            <td>{{=A("Details...", _href=URL('run_traceback', args=r_.id, user_signature=True), _class="traceback", _id="run_%s" % r_.id, **{'_data-toggle' : 'modal', '_data-target': '#myModal'})}}</td>
-            {{else:}}
-            <td></td>
-            {{pass}}
-            <td>{{=r_.worker_name}}</td>
-        </tr>
-        {{pass}}
-    </tbody>
-</table>
 
-{{if total > len(runs):}}
-<ul class="pager">
-    {{prev = page and URL(r=request, args=request.args, vars={'page': page and page or 1, 'qfilter':request.vars.qfilter or ''}, user_signature=True) or '#'}}
-    {{prev = prev != '#' and A('Previous', _href=prev, cid=request.cid) or A('Previous', _href='#')}}
-    {{next = total/paginate > page and URL(r=request, args=request.args, vars={'page' : page and page+2 or 2, 'qfilter':request.vars.qfilter or ''}, user_signature=True) or '#'}}
-    {{next = next != '#' and A('Next', _href=next, cid=request.cid) or A('Next', _href='#')}}
-    <li class="{{='' if page else 'disabled'}}">{{=prev}}</li>
-    <li>{{=A(page+1)}}</li>
-    <li class="{{='' if total/paginate > page else 'disabled'}}">{{=next}}</li>
-</ul>
-{{pass}}
+<div class="modal fade" id="task_traceback" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
 
-<div id="myModal" class="modal hide fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
-    <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
-        <h3 id="myModalLabel">Traceback</h3>
     </div>
-    <div class="modal-body">
-        <p></p>
-    </div>
-    <div class="modal-footer">
-        <button class="btn" data-dismiss="modal" aria-hidden="true">Close</button>
-    </div>
+  </div>
 </div>
 
 <script>
@@ -74,6 +86,11 @@ $(function() {
         var link = '{{=URL(r=request, args=request.args, user_signature=True)}}';
         web2py_ajax_page('post', link, $('#qfilter').serialize(), '{{=request.cid}}')
     });
+    $('#qclear').on('click', function(e) {
+        e.preventDefault();
+        var link = '{{=URL(r=request, args=request.args, user_signature=True)}}';
+        $.web2py.ajax_page('post', link, [], '{{=request.cid}}');
+    })
     $('#run_details').stupidtable();
 });
 </script>

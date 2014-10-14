@@ -1,13 +1,10 @@
 <div class="modal-header">
 	<button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-	<h4 class="modal-title">Delete Tasks</h4>
+	<h4 class="modal-title">Traceback</h4>
 </div>
 <div class="modal-body">
-Are you sure you want to delete 'COMPLETED', 'FAILED', 'EXPIRED', 'STOPPED' tasks
-that got QUEUED before {{=limit}} ?
+	{{=CODE(traceback)}}
 </div>
 <div class="modal-footer">
-	<a href="{{=URL(r=request, args=request.args, vars={'confirm' : 1}, user_signature=True)}}" class="btn btn-primary">Delete Tasks</a>
 	<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
 </div>
-

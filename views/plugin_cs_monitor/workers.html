@@ -1,55 +1,75 @@
-
-<h3>Workers</h3>
-
-<div class="btn-group" id="worker_actions">
-    <button class="btn" id="worker_all_toggler">Toggle <input type="checkbox" style="margin: 0;"></button>
-    <button class="btn dropdown-toggle" data-toggle="dropdown">
-    <span class="caret"></span>
-    </button>
-    <ul class="dropdown-menu">
-        <li><a href="#" data-action="ACTIVE">Resume</a></li>
-        <li><a href="#" data-action="DISABLED">Disable</a></li>
-        <li><a href="#" data-action="TERMINATE">Terminate</a></li>
-        <li><a href="#" data-action="KILL">Kill</a></li>
-    </ul>
+<div class="panel panel-primary">
+  <div class="panel-heading">
+    <h3 class="panel-title">Workers</h3>
+  </div>
+  <div class="panel-body">
+    <div id="pgbar" style="width: 100%;"></div>
+    <table id="worker_status" class="table table-condensed table-hover">
+        <thead>
+            <tr>
+                <th><input id="wchosen_action" name="action" class="hidden" type="string" value="none"/></th>
+                <th data-sort="string">Name</th>
+                <th data-sort="string">Group Names</th>
+                <th data-sort="string">Stats</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{for w_, props in sorted(w.iteritems()):}}
+            <tr>
+                <td>{{=INPUT(_type="checkbox", _name="w_records", _value=w_, value=request.vars.w_records)}}</td>
+                <td>
+                    <div class="worker_stats">
+                        <div class="list-group">
+                            <span class="list-group-item">{{=props.is_ticker and B('TICKER: ', w_ ) or w_}}</span>
+                            <span class="list-group-item">Status {{=props.status_}}</span>
+                            <span class="list-group-item">Started on <span class="rlabel">{{=props.first_heartbeat}}</span></span>
+                            <span class="list-group-item">Last Update <span class="rlabel">{{=props.last_heartbeat}}</span></span>
+                        </div>
+                    </div>
+                </td>
+                <td>{{=', '.join(props.group_names)}}</td>
+                <td>{{=DIV(props.worker_stats_, _class="worker_stats")}}</td>
+            </tr>
+            {{pass}}
+        </tbody>
+    </table>
+    <div class="panel-footer">
+        <div class="btn-toolbar" role="toolbar">
+            <div class="btn-group dropup" id="worker_actions">
+                <button class="btn btn-default" id="worker_all_toggler">Toggle</button>
+                <button class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+                <span class="caret"></span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a href="#" data-action="ACTIVE">Resume</a></li>
+                    <li><a href="#" data-action="DISABLED">Disable</a></li>
+                    <li><a href="#" data-action="TERMINATE">Terminate</a></li>
+                    <li><a href="#" data-action="KILL">Kill</a></li>
+                </ul>
+            </div>
+            <div class="btn-group">
+                <button id="workers_autorefresh" type="button" class="btn btn-primary">Auto-Refresh <span class="glyphicon"></span></button>
+            </div>
+        </div>
+    </div>
+  </div>
 </div>
-<button id="workers_autorefresh" type="button" class="btn" data-toggle="button">Auto-Refresh</button>
-<button id="clear_cache" type="button" class="btn">Clear Cache</button>
 
 
-<table id="worker_status" class="table table-condensed table-hover table-bordered">
-    <thead>
-        <tr>
-            <th><input id="wchosen_action" name="action" class="hidden" type="string" value="none"/></th>
-            <th data-sort="string">Name</th>
-            <th data-sort="string">Status</th>
-            <th data-sort="string">Started On</th>
-            <th data-sort="string">Last Update</th>
-            <th data-sort="string">Group Names</th>
-        </tr>
-    </thead>
-    <tbody>
-        {{for w_ in w:}}
-        <tr>
-            <td>{{=INPUT(_type="checkbox", _name="w_records", _value=w_.id, value=request.vars.w_records)}}</td>
-            <td>{{=w_.is_ticker and B('TICKER: ', w_.worker_name, ) or w_.worker_name}}</td>
-            <td>{{=w_.status_}}</td>
-            <td>{{=w_.first_heartbeat}}</td>
-            <td>{{=w_.last_heartbeat}}</td>
-            <td>{{=', '.join(w_.group_names)}}</td>
-        </tr>
-        {{pass}}
-    </tbody>
-<table>
 
-<script>
+
+<script type="text/javascript">
 $(function() {
-    if (window.location.search.indexOf('autorefresh=1') != -1) $('#workers_autorefresh').addClass('active')
+    if (window.location.search.indexOf('autorefresh=1') != -1) {
+        $('#workers_autorefresh').addClass('active')
+            .find('span').removeClass('glyphicon-repeat').addClass('glyphicon-refresh');
+    }
     $("#worker_all_toggler").on('click', function(e) {
         $('#worker_window').addClass('w2p_component_stop');
-        var checkb = $(this).find('input');
+        var checkb = $(this).hasClass('active');
+        $(this).toggleClass('active');
         var all_checkb = $("#worker_window input[type='checkbox']");
-        checkb.attr('checked') ? all_checkb.attr('checked', false) : all_checkb.attr('checked', true);
+        checkb ? all_checkb.attr('checked', false) : all_checkb.attr('checked', true);
     });
     $('#worker_status tbody tr').on('click', function(e) {
         $('#worker_window').addClass('w2p_component_stop');
@@ -60,22 +80,22 @@ $(function() {
     });
     $('#worker_actions li a').on('click', function(e) {
         e.preventDefault();
+        $('#worker_window').removeClass('w2p_component_stop');
         $('#wchosen_action').val($(this).data('action'));
         var link = '{{=BASEURL}}';
-        web2py_ajax_page('post', link, $('#worker_status input').serialize(), 'worker_window')
+        $.web2py.ajax(link, '#worker_status input', null);
+        $.web2py.invalidate(document);
     });
     $('#workers_autorefresh').on('click', function(e) {
         newlocation = window.location.search.replace('?autorefresh=1', '') + '?autorefresh=1'
         if ($(this).hasClass('active')) {
             $('#worker_window').addClass('w2p_component_stop');
             $('#tasks_window').addClass('w2p_component_stop');
+            $(this).removeClass('active')
+                .find('span').removeClass('glyphicon-refresh').addClass('glyphicon-repeat');
         } else {
             window.location = window.location.pathname + newlocation;
         }
-    });
-    $('#clear_cache').on('click', function(e) {
-        e.preventDefault();
-        web2py_ajax_page('post', '{{=URL("clear_cache", user_signature=True)}}', null, 'a');
     });
     $('#worker_status').stupidtable();
 });

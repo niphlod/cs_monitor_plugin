@@ -1,0 +1,130 @@
+{{extend 'layout.html'}}
+
+<style>
+
+
+.node rect {
+    stroke: #333;
+    stroke-width: 1.5px;
+    fill: #fff;
+}
+
+rect.QUEUED {
+	fill: #3A87AD;
+}
+rect.RUNNING {
+	fill: #F89406;
+}
+rect.COMPLETED {
+	fill: #468847;
+}
+g.nodes text {
+	fill: #fff;
+}
+rect.FAILED {
+	fill: #B94A48;
+}
+rect.STOPPED {
+	fill: #B94A48;
+}
+rect.EXPIRED {
+	fill: #F89406;
+}
+rect.ASSIGNED {
+	fill: #FAA732;
+}
+li.ciao {
+	background-color: red;
+}
+
+.edgeLabel rect {
+    fill: #fff;
+}
+
+.edgePath {
+    stroke: #333;
+    stroke-width: 1.5px;
+    fill: none;
+}
+</style>
+
+<h3>Show only job:</h3>
+<ul>
+{{for job in all_jobs:}}
+	<li>{{=A(job.job_name, _href=URL(vars=dict(job_name=job.job_name), user_signature=True))}}</li>
+{{pass}}
+</ul>
+
+<div id="steps"></div>
+
+<script id='template' type='text/ractive'>
+
+<div>
+    <h5>[[updated_on]]</h5>
+	<ul>
+		[[#topo:stepid]]
+			<li>step [[stepid]]</li>
+			<ul>
+				[[#.]]
+					<li>[[status]] [[task_name]] (fn: [[function_name]], id [[id]]) [[group_name]]</li>
+				[[/.]]
+			</ul>
+		[[/topo]]
+	</ul>
+</div>
+
+</script>
+
+
+
+<div class="row" style="overflow-y:scroll;height:1200px">
+	<svg width="100%" height="1200">
+	    <g transform="translate(20,20)"/>
+	</svg>
+</div>
+
+<script type="text/javascript">
+
+var ractivetopo = new Ractive({
+    el: 'steps',
+    template: '#template',
+    data: {},
+    delimiters: [ '[[', ']]' ]
+});
+
+function update_graph(nodes, tasks) {
+	var g = new dagreD3.Digraph();
+	$.each(tasks, function(i,e) {
+		var description = 'id:' + e.id + '\n' + e.uuid + '\n(' + e.group_name + ')';
+		var label = e.status + ' ' + e.task_name + '(fn:' + e.function_name + ')';
+		g.addNode(i.toString(), { 'label': label, class : e.status, 'description' : description})
+	})
+	$.each(nodes, function(i,e) {
+		g.addEdge(null, e.task_child.toString(), e.task_parent.toString(), { label : e.can_visit.toString()} )
+	})
+	var renderer = new dagreD3.Renderer();
+    var oldDrawNodes = renderer.drawNodes();
+    var cippa = renderer.drawEdgePaths();
+    renderer.drawNodes(function(graph, svg) {
+      var svgNodes = oldDrawNodes(graph, svg);
+      svgNodes.attr('title', function(u) {return g.node(u).description} ).select("rect").attr("class", function(u) { return g.node(u).class; });
+      return svgNodes;
+    });
+    renderer.run(g, d3.select("svg g"));
+}
+function fetcher(url) {
+	var url = '{{=XML(URL('show_graph_data.json', vars=dict(job_name=request.vars.job_name), user_signature=True))}}'
+	Promise.all([
+  		$.getJSON( url ),       // loads our app data
+		]).then( function ( results ) {
+  			var ajaxData = results[0];
+  			ractivetopo.merge('topo', ajaxData.topo, true);
+  			ractivetopo.set('updated_on', ajaxData.updated_on);
+  			update_graph(ajaxData.edges, ajaxData.tasks_dict);
+		})
+	}
+$(function() {
+	fetcher();
+	setInterval( "fetcher()", 5000 );
+})
+</script>

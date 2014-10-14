@@ -1,51 +1,74 @@
-{{extend 'layout.html'}}
+{{extend 'plugin_cs_monitor/layout.html'}}
 
-<div id="cs_monitor_plugin_utilities">
-    <div class="btn-group">
-        <button class="btn">Delete Tasks</button>
-        <button class="btn dropdown-toggle" data-toggle="dropdown">
-        <span class="caret"></span>
-        </button>
-        <ul class="dropdown-menu">
-            <li><a href="{{=URL('delete_tasks', args='1d', user_signature=True)}}" data-toggle="modal" data-target="#tasks_confirm_delete">Older than 1 day</a></li>
-            <li><a href="{{=URL('delete_tasks', args='3d', user_signature=True)}}" data-toggle="modal" data-target="#tasks_confirm_delete">Older than 3 days</a></li>
-            <li><a href="{{=URL('delete_tasks', args='1w', user_signature=True)}}" data-toggle="modal" data-target="#tasks_confirm_delete">Older than 1 week</a></li>
-            <li><a href="{{=URL('delete_tasks', args='1m', user_signature=True)}}" data-toggle="modal" data-target="#tasks_confirm_delete">Older than 1 month</a></li>
-            <li><a href="{{=URL('delete_tasks', args='3m', user_signature=True)}}" data-toggle="modal" data-target="#tasks_confirm_delete">Older than 3 months</a></li>
-        </ul>
+<div class="row">
+    <div class="col-md-12">
+        <div id="cs_monitor_plugin_utilities">
+            <div class="btn-toolbar" role="toolbar">
+                <div class="btn-group">
+                    <button class="btn btn-danger">Delete Tasks</button>
+                    <button class="btn btn-danger dropdown-toggle" data-toggle="dropdown">
+                    <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="{{=URL('delete_tasks', args='1d', user_signature=True)}}" data-toggle="modal" data-target="#tasks_confirm_delete">Older than 1 day</a></li>
+                        <li><a href="{{=URL('delete_tasks', args='3d', user_signature=True)}}" data-toggle="modal" data-target="#tasks_confirm_delete">Older than 3 days</a></li>
+                        <li><a href="{{=URL('delete_tasks', args='1w', user_signature=True)}}" data-toggle="modal" data-target="#tasks_confirm_delete">Older than 1 week</a></li>
+                        <li><a href="{{=URL('delete_tasks', args='1m', user_signature=True)}}" data-toggle="modal" data-target="#tasks_confirm_delete">Older than 1 month</a></li>
+                        <li><a href="{{=URL('delete_tasks', args='3m', user_signature=True)}}" data-toggle="modal" data-target="#tasks_confirm_delete">Older than 3 months</a></li>
+                    </ul>
+                </div>
+                <div class="btn-group">
+                    <a class="btn btn-success" href="{{=URL('edit_task', args=(0, 'new'), user_signature=True)}}">New Task</a>
+                </div>
+                <div class="btn-group">
+                    <button id="clear_cache" type="button" class="btn btn-warning">Clear Cache</button>
+                </div>
+                <div class="btn-group">
+                    <a class="btn btn-success" href="{{=URL('jobs', user_signature=True)}}">Jobs</a>
+                </div>
+            </div>
+        </div>
     </div>
-    <a class="btn" href="{{=URL('edit_task', args=(0, 'new'), user_signature=True)}}">New Task</a>
 </div>
 
-<div id="tasks_confirm_delete" class="modal hide fade">
-    <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal">&times;</button>
-        <h3>Delete Tasks</h3>
-    </div>
-    <div class="modal-body">
-        <p>Are You sure?</p>
-    </div>
+<div class="row"> <div class="col-md-12"></div></div>
 
+<div class="modal fade" id="tasks_confirm_delete" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+    </div>
+  </div>
 </div>
-
 
 
 {{autorefresh = request.vars.autorefresh == '1'}}
 
+<div class="row">
 {{if autorefresh:}}
-    {{=LOAD('plugin_cs_monitor', 'workers', ajax=True, user_signature=True, target="worker_window", times='Infinity', timeout=3000)}}
-    {{=LOAD('plugin_cs_monitor', 'tasks', ajax=True, user_signature=True, target="tasks_window", times='Infinity', timeout=3500)}}
+    <div class="col-md-8">
+        {{=LOAD('plugin_cs_monitor', 'workers', ajax=True, user_signature=True, target="worker_window", times='Infinity', timeout=3000)}}
+    </div>
+    <div class="col-md-4">
+        {{=LOAD('plugin_cs_monitor', 'tasks', ajax=True, user_signature=True, target="tasks_window", times='Infinity', timeout=3500)}}
+    </div>
 {{else:}}
-    {{=LOAD('plugin_cs_monitor', 'workers', ajax=True, user_signature=True, target="worker_window")}}
-    {{=LOAD('plugin_cs_monitor', 'tasks', ajax=True, user_signature=True, target="tasks_window")}}
+    <div class="col-md-8">
+        {{=LOAD('plugin_cs_monitor', 'workers', ajax=True, user_signature=True, target="worker_window")}}
+    </div>
+    <div class="col-md-4">
+        {{=LOAD('plugin_cs_monitor', 'tasks', ajax=True, user_signature=True, target="tasks_window")}}
+    </div>
 {{pass}}
+</div>
 
 <div id="task_group"></div>
 
 <script>
 $(function() {
-    $('#tasks_confirm_delete').on('hidden', function () {
-        $(this).removeData('modal');
-    })
+    $('#clear_cache').on('click', function(e) {
+        e.preventDefault();
+        web2py_ajax_page('post', '{{=URL("clear_cache", user_signature=True)}}', null, 'a');
+    });
 })
 </script>

@@ -5,27 +5,34 @@ from gluon.storage import Storage
 from gluon import current
 from gluon.serializers import json as dumps
 from gluon.tools import prettydate
-from plugin_cs_monitor.admin_scheduler_helpers import nice_worker_status, graph_colors_task_status, nice_task_status, mybootstrap, requeue_task
+from plugin_cs_monitor.html_helpers import nice_worker_status, graph_colors_task_status
+from plugin_cs_monitor.html_helpers import nice_worker_stats, nice_task_status, mybootstrap
+from plugin_cs_monitor.html_helpers import fixup_bs3_widgets
+from plugin_cs_monitor.scheduler_helpers import requeue_task
 from collections import defaultdict
 
-response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/jquery.jqplot.min.js'))
-response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/jquery.jqplot.min.css'))
-response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.barRenderer.min.js'))
-response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.pieRenderer.min.js'))
-response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.dateAxisRenderer.min.js'))
-response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.pointLabels.min.js'))
-response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.cursor.min.js'))
-response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.enhancedLegendRenderer.min.js'))
-response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.highlighter.min.js'))
-response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.canvasTextRenderer.min.js'))
-response.files.append(URL('static', 'plugin_cs_monitor/js/jqplot/plugins/jqplot.canvasAxisTickRenderer.min.js'))
 response.files.append(URL('static', 'plugin_cs_monitor/js/stupidtable/stupidtable.min.js'))
+
+response.files.append(URL('static', 'plugin_cs_monitor/js/underscore/underscore.min.js'))
+
+response.files.append(URL('static', 'plugin_cs_monitor/js/moment/moment.min.js'))
+response.files.append(URL('static', 'plugin_cs_monitor/js/datetimepicker/bootstrap-datetimepicker.min.js'))
+response.files.append(URL('static', 'plugin_cs_monitor/js/datetimepicker/bootstrap-datetimepicker.min.css'))
+
+response.files.append(URL('static', 'plugin_cs_monitor/js/c3/d3.v3.min.js'))
+response.files.append(URL('static', 'plugin_cs_monitor/js/c3/c3.css'))
+response.files.append(URL('static', 'plugin_cs_monitor/js/c3/c3.min.js'))
+
+response.files.append(URL('static', 'plugin_cs_monitor/js/dagre/dagre-d3.min.js'))
+
+response.files.append(URL('static', 'plugin_cs_monitor/js/app.js'))
 
 ##Configure start
 sc_cache = cache.ram
-GROUPING_MODE = 'database' # or 'python'
+GROUPING_MODE = 'database'  # or 'python'
 ANALYZE_CACHE_TIME = 60
 TASKS_SUMMARY_CACHE_TIME = 10
+PAGINATE = 10
 ##Configure end
 
 s = current._scheduler
@@ -33,14 +40,21 @@ dbs = s.db
 st = dbs.scheduler_task
 sw = dbs.scheduler_worker
 sr = dbs.scheduler_run
+sd = dbs.scheduler_task_deps
 
 
-ANALYZE_CACHE_KWARGS = {'cache' : (cache.with_prefix(sc_cache, "plugin_cs_monitor"),ANALYZE_CACHE_TIME), 'cacheable' : True}
+ANALYZE_CACHE_KWARGS = {
+    'cache': (cache.with_prefix(sc_cache, "plugin_cs_monitor"), ANALYZE_CACHE_TIME),
+    'cacheable': True}
+
+TASKS_SUMMARY_KWARGS = {
+    'cache': (cache.with_prefix(sc_cache, "plugin_cs_monitor"),TASKS_SUMMARY_CACHE_TIME),
+    'cacheable' : True}
 
 response.meta.author = 'Niphlod <niphlod@gmail.com>'
 response.title = 'ComfortScheduler Monitor'
-response.subtitle = '1.2.1'
-response.static_version = '1.2.1'
+response.subtitle = '2.0.0'
+response.static_version = '2.0.0'
 
 try:
     response.menu.append(
@@ -49,21 +63,23 @@ try:
 except:
     pass
 
+
 @auth.requires_login()
 def index():
-
     return dict()
 
 @auth.requires_signature()
 def workers():
+    session.forget(response)
     now = s.utc_time and request.utcnow or request.now
     limit = now - timed(seconds=s.heartbeat * 3 * 10)
-    w = dbs(sw.id > 0).select(orderby=~sw.id)
-    for row in w:
-        if row.last_heartbeat < limit:
-            row.status_ = nice_worker_status('Probably Dead')
+    w = s.get_workers()
+    for worker, props in w.iteritems():
+        if props.last_heartbeat < limit:
+            props.status_ = nice_worker_status('Probably Dead')
         else:
-            row.status_ = nice_worker_status(row.status)
+            props.status_ = nice_worker_status(props.status)
+        props.worker_stats_ = nice_worker_stats(props.worker_stats)
 
     BASEURL = URL("plugin_cs_monitor", "wactions", user_signature=True)
 
@@ -72,6 +88,7 @@ def workers():
 
 @auth.requires_signature()
 def wactions():
+    session.forget(response)
     default = URL('workers', user_signature=True)
     if not request.vars.action or request.vars.action == 'none':
         session.flash = "No action selected"
@@ -83,7 +100,7 @@ def wactions():
         r = [request.vars.w_records]
     else:
         r = request.vars.w_records
-    rtn = dbs(sw.id.belongs(r)).validate_and_update(status=request.vars.action)
+    rtn = dbs(sw.worker_name.belongs(r)).validate_and_update(status=request.vars.action)
     if rtn.errors:
         session.flash = "Not a valid action"
     elif rtn.updated:
@@ -92,6 +109,7 @@ def wactions():
 
 @auth.requires_signature()
 def tactions():
+    session.forget(response)
     default = request.vars.current_page or URL('task_group', user_signature=True)
     action = request.vars.action
     if not action or action == 'none':
@@ -152,13 +170,12 @@ def tactions():
 
 @auth.requires_signature()
 def tasks():
-
+    session.forget(response)
     c = cache_tasks_counts(st)
 
     return dict(c=c)
 
 def cache_tasks_counts(t):
-    TASKS_SUMMARY_KWARGS = {'cache' : (cache.with_prefix(sc_cache, "plugin_cs_monitor"),TASKS_SUMMARY_CACHE_TIME), 'cacheable' : True}
 
     if GROUPING_MODE == 'python':
         res = dbs(t.id > 0).select(t.group_name, t.status, orderby=t.group_name|t.status, **TASKS_SUMMARY_KWARGS)
@@ -187,16 +204,17 @@ def cache_tasks_counts(t):
 
 @auth.requires_signature()
 def task_group():
+    session.forget(response)
     group_name, status = request.args(0), request.args(1)
     if not group_name:
         return ''
     c = cache_tasks_counts(st)
-    paginate = 10
+    paginate = PAGINATE
     try:
-        page = int(request.vars.page or 1)-1
+        page = int(request.vars.page or 1) - 1
     except ValueError:
         page = 0
-    limitby = (paginate*page,paginate*(page+1))
+    limitby = (paginate * page, paginate * (page + 1))
     q = (st.group_name == group_name)
     if status:
         q = q & (st.status == status)
@@ -217,6 +235,7 @@ def task_group():
             parts.append(a.contains(qfilter))
             qf = reduce(lambda a, b: a | b, parts)
         q = q & qf
+        total = dbs(q).count()
     tasks = dbs(q).select(limitby=limitby, orderby=~st.next_run_time)
     for row in tasks:
         row.status_ = nice_task_status(row.status)
@@ -226,15 +245,19 @@ def task_group():
 
 @auth.requires_signature()
 def task_details():
+    session.forget(response)
     id = request.args(0)
     task = dbs(st.id == id).select().first()
     if not task:
         return ''
     task.status_ = nice_task_status(task.status)
-    return dict(task=task, st=st)
+    deps = dbs((sd.task_parent == id) | (sd.task_child == id)).select(sd.job_name, groupby=sd.job_name)
+    deps = [row.job_name for row in deps]
+    return dict(task=task, st=st, deps=deps)
 
 @auth.requires_signature()
 def run_details():
+    session.forget(response)
     task_id = request.args(0)
     if not task_id:
         return ''
@@ -267,13 +290,14 @@ def run_details():
 
 @auth.requires_signature()
 def run_traceback():
+    session.forget(response)
     run_id = request.args(0)
     if not run_id:
         return ''
     rtn = dbs(sr.id == run_id).select(sr.traceback).first()
     if not rtn:
         return ''
-    return CODE(rtn.traceback)
+    return dict(traceback=rtn.traceback)
 
 @auth.requires_signature()
 def edit_task():
@@ -321,6 +345,10 @@ def edit_task():
             session.flash = 'Task requeue failed'
             redirect(URL('edit_task', args=task_id, user_signature=True))
         task = None
+
+    fixup_bs3_widgets(SQLFORM)
+
+    st.function_name.requires = IS_NOT_EMPTY()
     form = SQLFORM(st, task, formstyle=mybootstrap)
     if form.process().accepted:
         if request.args(1) == 'new':
@@ -408,7 +436,7 @@ def gb_status(q, mode='runs'):
     jgb_status_series = []
     for k,v in gb_status_series.items():
         jgb_status_series.append(
-            {'label' : k, 'color' : graph_colors_task_status(k), 'data' : (k,v)}
+            {'label' : k, 'color' : graph_colors_task_status(k), 'data' : [v]}
         )
 
     return gb_status_rows, jgb_status_series
@@ -541,6 +569,7 @@ def byday(q, day, mode):
 
 @auth.requires_signature()
 def analyze_task():
+    session.forget(response)
     task_id = request.args(0)
     if not task_id:
         return ''
@@ -565,7 +594,6 @@ def analyze_task():
         first_run_pretty = 'Never'
     else:
         mode = 'runs'
-    last_run 
     if len(request.args) >= 2:
         if request.args(1) == 'byfunction':
             if mode == 'runs':
@@ -622,6 +650,7 @@ def clear_cache():
 
 @auth.requires_signature()
 def delete_tasks():
+    session.forget(response)
     period = request.args(0)
     if not period in ['1d', '3d', '1w', '1m', '3m']:
         return ''
@@ -647,3 +676,43 @@ def delete_tasks():
         redirect(URL('index'))
     limit = limit.strftime('%Y-%m-%d %H:%M:%S')
     return dict(limit=limit)
+
+@auth.requires_signature()
+def jobs():
+    session.forget(response)
+    q = sd.id > 0
+    if request.vars.job_name:
+        q = sd.job_name == request.vars.job_name
+    all_jobs = dbs(q).select(sd.job_name, groupby=sd.job_name)
+    all_jobs = dict([(row.job_name, "a_%s" % k) for k, row in enumerate(all_jobs)])
+    all_deps = dbs(q).select()
+
+    all_nodes = {}
+    all_edges = {}
+    for row in all_deps:
+        jname_slug = all_jobs[row.job_name]
+        if jname_slug not in all_nodes:
+            all_nodes[jname_slug] = {}
+        all_nodes[jname_slug][row.task_parent] = None
+        all_nodes[jname_slug][row.task_child] = None
+        if jname_slug not in all_edges:
+            all_edges[jname_slug] = []
+        all_edges[jname_slug].append((row.task_child, row.task_parent,
+            dict(style="stroke: %s" % (row.can_visit and '#5CB85C' or '#D9534F'))))
+
+    all_tasks_ids = {}
+    for k, v in all_nodes.iteritems():
+        for id in v.keys():
+            all_tasks_ids[id] = None
+
+    all_tasks_labels = dbs(st.id.belongs(all_tasks_ids.keys())).select().as_dict()
+
+    for k, v in all_nodes.iteritems():
+        for id in v.keys():
+            all_nodes[k][id] = dict(label=all_tasks_labels[id]['task_name'],
+                style="fill: %s;" % graph_colors_task_status(all_tasks_labels[id]['status']),
+                title="%(id)s (%(function_name)s): %(status)s" % all_tasks_labels[id],
+                linkto=URL('task_details', args=id, user_signature=True))
+
+    return dict(all_jobs=all_jobs, all_edges=dumps(all_edges), all_nodes=dumps(all_nodes))
+

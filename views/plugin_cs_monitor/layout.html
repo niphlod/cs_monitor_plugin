@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html class="no-js" lang="{{=T.accepted_language or 'en'}}">
+  <head>
+    <title>{{=response.title or request.application}}</title>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="application-name" content="{{=request.application}}" />
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="shortcut icon" href="{{=URL('static','images/favicon.ico')}}" type="image/x-icon">
+    <link rel="apple-touch-icon" href="{{=URL('static','images/favicon.png')}}">
+    {{
+    response.files.append(URL('static','css/web2py.css'))
+    response.files.append(URL('static','plugin_cs_monitor/css/bootstrap.min.css'))
+    response.files.append(URL('static','plugin_cs_monitor/css/layout.css'))
+    response.files.append(URL('static','plugin_cs_monitor/js/bootstrap.min.js'))
+    response.files.append(URL('static','plugin_cs_monitor/js/ie10-viewport-bug-workaround.js'))
+    }}
+    {{include 'web2py_ajax.html'}}
+
+    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="{{=URL('static','plugin_cs_monitor/js/respond.min.js')}}"></script>
+      <script src="{{=URL('static','plugin_cs_monitor/css/html5shiv.min.js')}}"></script>
+    <![endif]-->
+  </head>
+
+  <body>
+
+    <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target=".navbar-collapse">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#">Comfy Scheduler Monitor</a>
+        </div>
+        <div class="navbar-collapse collapse">
+          <ul class="nav navbar-nav">
+          {{if response.menu:}}
+            {{for mainitem in response.menu:}}
+              {{if mainitem[3]:}}
+                {{=LI(
+                    A(mainitem[0], SPAN(_class="caret"), _href="#", _class="dropdown-toggle", data=dict(toggle="dropdown")),
+                    UL(
+                      [LI(A(subitem[0], _href=subitem[2])) for subitem in mainitem[3]],
+                    _class="dropdown-menu", _role="menu"),
+                _class="dropdown")}}
+              {{else:}}
+                {{=LI(A(mainitem[0], _href=mainitem[2]))}}
+              {{pass}}
+            {{pass}}
+          {{pass}}
+          </ul>
+          <ul class="nav navbar-nav navbar-right">
+            {{ mymenu = 'auth' in globals() and auth.navbar(mode="bare") or []}}
+            {{if 'user' in mymenu:}}
+              {{=LI(
+                  A("%(user)s" % mymenu, SPAN(_class="caret"), _href="#", _class="dropdown-toggle", data=dict(toggle="dropdown")),
+                  UL(
+                    LI(A('Profile', _href=mymenu['profile'], _rel="nofollow")),
+                    LI(A('Change PWD', _href=mymenu['change_password'], _rel="nofollow")),
+                    LI(A('Logout', _href=mymenu['logout'], _rel="nofollow")),
+                  _class="dropdown-menu", _role="menu"),
+              _class="dropdown")}}
+            {{else:}}
+              {{=LI(A('Login', _href=mymenu['login'], _rel="nofollow"))}}
+              {{=LI(A('Signup', _href=mymenu['register'], _rel="nofollow"))}}
+            {{pass}}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="container-fluid">
+      <div class="row">
+        <!-- <div class="col-sm-3 col-md-2 sidebar">
+          <ul class="nav nav-sidebar">
+            <li class="active"><a href="#">Overview</a></li>
+            <li><a href="#">Reports</a></li>
+            <li><a href="#">Analytics</a></li>
+            <li><a href="#">Export</a></li>
+          </ul>
+          <ul class="nav nav-sidebar">
+            <li><a href="">Nav item</a></li>
+            <li><a href="">Nav item again</a></li>
+            <li><a href="">One more nav</a></li>
+            <li><a href="">Another nav item</a></li>
+            <li><a href="">More navigation</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main"> -->
+        <div class="col-md-12 main">
+            <div class="flashbs3 alert alert-info alert-dismissible" role="alert">
+              <span class="flashcont">{{=response.flash or ''}}</span>
+            </div>
+        {{block center}}
+              {{include}}
+        {{end}}
+        </div>
+      </div>
+    </div>
+    <script type="text/javascript">
+      $(document).ready(function () {
+        //select active link in menu by default
+        $('a[href="' + this.location.pathname + '"]').parent().addClass('active');
+    });
+    </script>
+  </body>
+</html>

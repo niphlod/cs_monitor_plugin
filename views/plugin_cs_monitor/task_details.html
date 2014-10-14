@@ -1,18 +1,30 @@
-{{extend 'layout.html'}}
-<h3>Task</h3>
+{{extend 'plugin_cs_monitor/layout.html'}}
+<h3 class="sub-header">Task</h3>
 
-
-<div class="btn-group">
-    {{=A("Create New", _class="btn btn-success", _href=URL('edit_task', args=[task.id, 'new'], user_signature=True))}}
-    {{=A("Edit", _class="btn btn-info", _href=URL('edit_task', args=task.id, user_signature=True))}}
-    {{=A("Clone and Requeue", _class="btn btn-warning", _href=URL('edit_task', args=[task.id, 'clone'], user_signature=True))}}
-    {{=A("Delete", _class="btn btn-danger", _href=URL('edit_task', args=[task.id, 'delete'], user_signature=True))}}
-    {{if task.status != 'STOPPED':}}
-        {{=A("Stop Task", _class="btn btn-danger", _href=URL('edit_task', args=[task.id, 'stop'], user_signature=True))}}
-    {{else:}}
-        {{=A("Requeue", _class="btn btn-danger", _href=URL('edit_task', args=[task.id, 'requeue'], user_signature=True))}}
+<div class="btn-toolbar" role="toolbar">
+    <div class="btn-group">
+        {{=A("Create New", _class="btn btn-success", _href=URL('edit_task', args=[task.id, 'new'], user_signature=True))}}
+        {{=A("Edit", _class="btn btn-info", _href=URL('edit_task', args=task.id, user_signature=True))}}
+        {{=A("Delete", _class="btn btn-danger", _href=URL('edit_task', args=[task.id, 'delete'], user_signature=True))}}
+    </div>
+    <div class="btn-group">
+        {{=A("Clone and Requeue", _class="btn btn-warning", _href=URL('edit_task', args=[task.id, 'clone'], user_signature=True))}}
+        {{if task.status != 'STOPPED':}}
+            {{=A("Stop Task", _class="btn btn-danger", _href=URL('edit_task', args=[task.id, 'stop'], user_signature=True))}}
+        {{else:}}
+            {{=A("Requeue", _class="btn btn-danger", _href=URL('edit_task', args=[task.id, 'requeue'], user_signature=True))}}
+        {{pass}}
+    </div>
+    <div class="btn-group">
+        {{=A("Analyze", _class="btn btn-primary", _href=URL('analyze_task', args=task.id, user_signature=True))}}
+    </div>
+    {{if deps:}}
+    <div class="btn-group">
+        {{for job_name in deps:}}
+            {{=A("Job %s" % job_name, _class="btn btn-primary", _href=URL('jobs', vars=dict(job_name=job_name), user_signature=True))}}
+        {{pass}}
+    </div>
     {{pass}}
-    {{=A("Analyze", _class="btn btn-primary", _href=URL('analyze_task', args=task.id, user_signature=True))}}
 </div>
 
 <table class="task_details table table-condensed table-hover table-bordered">
