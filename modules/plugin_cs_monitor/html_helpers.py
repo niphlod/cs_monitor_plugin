@@ -11,7 +11,7 @@ TASK_STATUS = {
         'STOPPED' : ('#B94A48', SPAN('STOPPED', _class="label label-danger")),
         'EXPIRED' : ('#F89406', SPAN('EXPIRED', _class="label label-warning")),
         'ASSIGNED' : ('#FAA732', SPAN('ASSIGNED', _class="label label-warning")),
-        'TIMEOUT' : ('#FAA732', SPAN('TIMEOUT', _class="label label-warning")),
+        'TIMEOUT' : ('#B94A48', SPAN('TIMEOUT', _class="label label-warning")),
         }
 
 WORKER_STATUS = {

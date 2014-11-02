@@ -1,0 +1,97 @@
+
+<div class="row">
+	<div class="col-md-4">
+		<div class="control-group">
+			<input id="parent_job" type="hidden" style="width:100%;">
+		</div>
+	</div>
+	<div class="col-md-4">
+		<div class="control-group">
+			<input id="child_job" type="hidden" style="width:100%;">
+		</div>
+	</div>
+	<div class="col-md-4">
+		<div class="control-group">
+			<button id="add_task" type="button" value="{{=request.vars.job_name}}" class="btn btn-sm btn-default disabled">Add to job</button>
+		</div>
+	</div>
+</div>
+
+
+<script type="text/javascript">
+$(function() {
+	function enable_button() {
+		var parent = '', child = '';
+		parent = $('#parent_job').val();
+		child = $('#child_job').val();
+		parent_multiple = parent.indexOf(',') != -1
+		child_multiple = child.indexOf(',') != -1
+		if ((parent != '') && (child != '')) {
+			if (parent != child) {
+				if (!(parent_multiple && child_multiple)) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+    $('#parent_job').select2({
+    	minimumInputLength: 1,
+    	placeholder: "Parent (before this) ...",
+    	multiple : true,
+    	 ajax: { // instead of writing the function to execute the request we use Select2's convenient helper
+			url: '{{=URL('tasks_dropdown_helper.json', user_signature=True, hash_vars=False)}}',
+			quietMillis : 300,
+			dataType: 'json',
+			data: function (term, page) {
+				return {
+				q: term, // search term
+				job_name : '{{=request.vars.job_name}}'
+				};
+			},
+			results: function (data, page) { // parse the results into the format expected by Select2.
+			// since we are using custom formatting functions we do not need to alter remote JSON data
+				return {results: data.results};
+				}
+			},
+    }).on('change', function() {$('#add_task').toggleClass('disabled', enable_button())});
+    $('#child_job').select2({
+    	minimumInputLength: 1,
+    	multiple : true,
+    	placeholder: "Child (comes this)...",
+    	 ajax: { // instead of writing the function to execute the request we use Select2's convenient helper
+			url: '{{=URL('tasks_dropdown_helper.json', user_signature=True, hash_vars=False)}}',
+			quietMillis : 300,
+			dataType: 'json',
+			data: function (term, page) {
+				return {
+				q: term, // search term
+				job_name : '{{=request.vars.job_name}}'
+				};
+			},
+			results: function (data, page) { // parse the results into the format expected by Select2.
+			// since we are using custom formatting functions we do not need to alter remote JSON data
+				return {results: data.results};
+				}
+			},
+    }).on('change', function() {$('#add_task').toggleClass('disabled', enable_button())});
+    $('#add_task').on('click', function () {
+    	if ($(this).hasClass('disabled')) {
+    		$.web2py.flash('You need to select tasks to add');
+    	} else {
+    		var obj = {};
+	    	obj['job_name'] = $(this).val();
+	    	obj['task_parent'] = $('#parent_job').val();
+	    	obj['task_child'] = $('#child_job').val();
+	    	$.ajax({
+				type: "POST",
+				url: '{{=URL('edit_job', user_signature=True, hash_vars=False)}}',
+				data: obj,
+				success: function() {
+					location.reload();
+				},
+				});
+    	}
+    })
+});
+</script>

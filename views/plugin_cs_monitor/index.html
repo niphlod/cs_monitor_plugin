@@ -42,10 +42,10 @@
 </div>
 
 
-{{autorefresh = request.vars.autorefresh == '1'}}
+{{refresh = request.vars.refresh == '1'}}
 
 <div class="row">
-{{if autorefresh:}}
+{{if refresh:}}
     <div class="col-md-8">
         {{=LOAD('plugin_cs_monitor', 'workers', ajax=True, user_signature=True, target="worker_window", times='Infinity', timeout=3000)}}
     </div>
@@ -68,7 +68,7 @@
 $(function() {
     $('#clear_cache').on('click', function(e) {
         e.preventDefault();
-        web2py_ajax_page('post', '{{=URL("clear_cache", user_signature=True)}}', null, 'a');
+        $.web2py.ajax_page('post', '{{=URL("clear_cache", user_signature=True)}}', null, 'a');
     });
 })
 </script>

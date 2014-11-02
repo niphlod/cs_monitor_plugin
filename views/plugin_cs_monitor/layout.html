@@ -43,7 +43,7 @@
           <ul class="nav navbar-nav">
           {{if response.menu:}}
             {{for mainitem in response.menu:}}
-              {{if mainitem[3]:}}
+              {{if len(mainitem) == 4 and mainitem[3]:}}
                 {{=LI(
                     A(mainitem[0], SPAN(_class="caret"), _href="#", _class="dropdown-toggle", data=dict(toggle="dropdown")),
                     UL(
