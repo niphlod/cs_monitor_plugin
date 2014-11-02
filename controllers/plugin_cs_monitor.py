@@ -1,6 +1,7 @@
  # coding: utf8
 from datetime import timedelta as timed
 import datetime
+import time
 from gluon.storage import Storage
 from gluon import current
 from gluon.serializers import json as dumps
@@ -9,6 +10,7 @@ from plugin_cs_monitor.html_helpers import nice_worker_status, graph_colors_task
 from plugin_cs_monitor.html_helpers import nice_worker_stats, nice_task_status, mybootstrap
 from plugin_cs_monitor.html_helpers import fixup_bs3_widgets
 from plugin_cs_monitor.scheduler_helpers import requeue_task
+from gluon.scheduler import JobGraph
 from collections import defaultdict
 
 response.files.append(URL('static', 'plugin_cs_monitor/js/stupidtable/stupidtable.min.js'))
@@ -24,6 +26,9 @@ response.files.append(URL('static', 'plugin_cs_monitor/js/c3/c3.css'))
 response.files.append(URL('static', 'plugin_cs_monitor/js/c3/c3.min.js'))
 
 response.files.append(URL('static', 'plugin_cs_monitor/js/dagre/dagre-d3.min.js'))
+
+response.files.append(URL('static', 'plugin_cs_monitor/js/select2/select2.min.js'))
+response.files.append(URL('static', 'plugin_cs_monitor/js/select2/select2-bootstrap.css'))
 
 response.files.append(URL('static', 'plugin_cs_monitor/js/app.js'))
 
@@ -48,7 +53,7 @@ ANALYZE_CACHE_KWARGS = {
     'cacheable': True}
 
 TASKS_SUMMARY_KWARGS = {
-    'cache': (cache.with_prefix(sc_cache, "plugin_cs_monitor"),TASKS_SUMMARY_CACHE_TIME),
+    'cache': (cache.with_prefix(sc_cache, "plugin_cs_monitor"), TASKS_SUMMARY_CACHE_TIME),
     'cacheable' : True}
 
 response.meta.author = 'Niphlod <niphlod@gmail.com>'
@@ -100,12 +105,12 @@ def wactions():
         r = [request.vars.w_records]
     else:
         r = request.vars.w_records
+    for w in r:
+        s.set_worker_status(action=request.vars.action, worker_name=w)
     rtn = dbs(sw.worker_name.belongs(r)).validate_and_update(status=request.vars.action)
-    if rtn.errors:
-        session.flash = "Not a valid action"
-    elif rtn.updated:
-        session.flash = "%s workers updated correctly" % rtn.updated
-        redirect(default)
+    session.flash = "%s workers updated correctly" % len(r)
+    redirect(default)
+
 
 @auth.requires_signature()
 def tactions():
@@ -168,12 +173,14 @@ def tactions():
 
     redirect(default)
 
+
 @auth.requires_signature()
 def tasks():
     session.forget(response)
     c = cache_tasks_counts(st)
 
     return dict(c=c)
+
 
 def cache_tasks_counts(t):
 
@@ -201,6 +208,7 @@ def cache_tasks_counts(t):
                 rtn[k][s] = { 'count' : row[c], 'pretty' : nice_task_status(s)}
 
     return rtn
+
 
 @auth.requires_signature()
 def task_group():
@@ -243,6 +251,7 @@ def task_group():
     BASEURL = URL("plugin_cs_monitor", "tactions", user_signature=True)
     return dict(tasks=tasks, paginate=paginate, total=total, page=page, BASEURL=BASEURL)
 
+
 @auth.requires_signature()
 def task_details():
     session.forget(response)
@@ -254,6 +263,7 @@ def task_details():
     deps = dbs((sd.task_parent == id) | (sd.task_child == id)).select(sd.job_name, groupby=sd.job_name)
     deps = [row.job_name for row in deps]
     return dict(task=task, st=st, deps=deps)
+
 
 @auth.requires_signature()
 def run_details():
@@ -288,6 +298,7 @@ def run_details():
         row.elapsed_seconds_ = td
     return dict(runs=runs, paginate=paginate, total=total, page=page)
 
+
 @auth.requires_signature()
 def run_traceback():
     session.forget(response)
@@ -298,6 +309,7 @@ def run_traceback():
     if not rtn:
         return ''
     return dict(traceback=rtn.traceback)
+
 
 @auth.requires_signature()
 def edit_task():
@@ -359,6 +371,7 @@ def edit_task():
         response.flash = 'Errors detected'
     return dict(form=form, task=task)
 
+
 def gb_duration(q):
     #byduration
     count_ = sr.id.count()
@@ -397,6 +410,7 @@ def gb_duration(q):
             )
 
     return gb_duration_rows, jgb_duration_series
+
 
 def gb_status(q, mode='runs'):
     #bystatus
@@ -440,6 +454,7 @@ def gb_status(q, mode='runs'):
         )
 
     return gb_status_rows, jgb_status_series
+
 
 def bydate(q, mode):
     #by period
@@ -502,6 +517,7 @@ def bydate(q, mode):
         )
 
     return gb_when_rows, jgb_when_series
+
 
 def byday(q, day, mode):
     #by period
@@ -648,6 +664,7 @@ def clear_cache():
     session.flash = 'Cache Cleared'
     redirect(URL("index"), client_side=True)
 
+
 @auth.requires_signature()
 def delete_tasks():
     session.forget(response)
@@ -677,16 +694,26 @@ def delete_tasks():
     limit = limit.strftime('%Y-%m-%d %H:%M:%S')
     return dict(limit=limit)
 
-@auth.requires_signature()
+
+@auth.requires_signature(hash_vars=False)
 def jobs():
+    return dict()
+
+
+@auth.requires_signature(hash_vars=False)
+def jobs_render():
     session.forget(response)
-    q = sd.id > 0
     if request.vars.job_name:
         q = sd.job_name == request.vars.job_name
-    all_jobs = dbs(q).select(sd.job_name, groupby=sd.job_name)
-    all_jobs = dict([(row.job_name, "a_%s" % k) for k, row in enumerate(all_jobs)])
-    all_deps = dbs(q).select()
+        all_jobs = {request.vars.job_name : 'a_0'}
+        newjob = None
+    else:
+        q = sd.id > 0
+        all_jobs = dbs(q).select(sd.job_name, groupby=sd.job_name)
+        all_jobs = dict([(row.job_name, "a_%s" % k) for k, row in enumerate(all_jobs)])
+        newjob = str(int(time.mktime(datetime.datetime.utcnow().timetuple())))
 
+    all_deps = dbs(q).select()
     all_nodes = {}
     all_edges = {}
     for row in all_deps:
@@ -705,7 +732,9 @@ def jobs():
         for id in v.keys():
             all_tasks_ids[id] = None
 
-    all_tasks_labels = dbs(st.id.belongs(all_tasks_ids.keys())).select().as_dict()
+    all_tasks_labels = dbs(st.id.belongs(all_tasks_ids.keys())).select(
+        st.id, st.function_name, st.task_name, st.status
+        ).as_dict()
 
     for k, v in all_nodes.iteritems():
         for id in v.keys():
@@ -714,5 +743,48 @@ def jobs():
                 title="%(id)s (%(function_name)s): %(status)s" % all_tasks_labels[id],
                 linkto=URL('task_details', args=id, user_signature=True))
 
-    return dict(all_jobs=all_jobs, all_edges=dumps(all_edges), all_nodes=dumps(all_nodes))
+    return dict(all_jobs=all_jobs, all_edges=dumps(all_edges), all_nodes=dumps(all_nodes), newjob=newjob)
 
+@auth.requires_signature(hash_vars=False)
+def edit_job():
+    posted = request.post_vars
+    if posted:
+        if ',' in posted.task_child and ',' in posted.task_parent:
+            session.flash = 'Only one multiple value allowed'
+            return dict()
+        if ',' in posted.task_child:
+            posted.task_child = posted.task_child.split(',')
+        else:
+            posted.task_child = [posted.task_child]
+        if ',' in posted.task_parent:
+            posted.task_parent = posted.task_parent.split(',')
+        else:
+            posted.task_parent = [posted.task_parent]
+        myjob = JobGraph(dbs, posted.job_name)
+        for child in posted.task_child:
+            for parent in posted.task_parent:
+                myjob.add_deps(parent, child)
+        rtn = myjob.validate(posted.job_name)
+        if rtn is None:
+            session.flash = "No task added, validation failed"
+        else:
+            session.flash = "Dependency correctly added"
+    return dict()
+
+@auth.requires_signature(hash_vars=False)
+def tasks_dropdown_helper():
+    session.forget(response)
+    if not request.get_vars.q:
+        raise HTTP(404)
+    q = request.get_vars.q
+    all_tasks = dbs(
+        (st.task_name.ilike('%' + q + '%')) |
+        (st.id.ilike('%' + q + '%'))
+            ).select(
+        st.id, st.task_name
+        )
+    rtn = []
+    for row in all_tasks:
+        rtn.append(dict(id=row.id, text='%(id)s - %(task_name)s' % row))
+
+    return dumps(dict(results=rtn))

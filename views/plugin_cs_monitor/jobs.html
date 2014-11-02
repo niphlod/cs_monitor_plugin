@@ -1,52 +1,44 @@
 {{extend 'plugin_cs_monitor/layout.html'}}
 
+<div class="btn-group">
+    <button id="jobs_autorefresh" type="button" class="btn btn-primary">Auto-Refresh <span class="glyphicon"></span></button>
+</div>
 
-<div class="list-group">
-{{for job in all_jobs:}}
-	{{=A(job, _href=URL('jobs', vars=dict(job_name=job), user_signature=True), _class="list-group-item")}}
+{{refresh = request.vars.refresh == '1'}}
+{{job_name = request.vars.job_name and dict(job_name=request.vars.job_name) or None}}
+
+<div class="row">
+{{if refresh:}}
+    <div class="col-md-12">
+        {{=LOAD(url=URL('jobs_render', vars=job_name, user_signature=True, hash_vars=False), ajax=True, target="jobs_window", times='Infinity', timeout=3000)}}
+    </div>
+{{else:}}
+    <div class="col-md-12">
+        {{=LOAD(url=URL('jobs_render', vars=job_name, user_signature=True, hash_vars=False), ajax=True, target="jobs_window")}}
+    </div>
 {{pass}}
 </div>
 
-{{for job, job_slug in all_jobs.iteritems():}}
-<div class="panel panel-default">
-  <div class="panel-heading">{{=job}}</div>
-  <div class="panel-body">
-    <svg id="{{="cont_%s" % job_slug}}" width=40 height=40>
-    	<g id="{{=job_slug}}" transform="translate(20,20)"/>
-	</svg>
-  </div>
-</div>
-
+{{if job_name:}}
+    {{=LOAD(url=URL('edit_job', vars=job_name, user_signature=True, hash_vars=False))}}
 {{pass}}
 
-<script>
 
+<script type="text/javascript">
 $(function() {
-	var all_nodes = {{=XML(all_nodes)}};
-	var all_edges = {{=XML(all_edges)}};
-	_.each(all_nodes, function(v, k, l) {
-		var g = new dagreD3.Digraph();
-		_.each(v, function(v_, k_, l_) {
-			g.addNode(k_.toString(), v_);
-		})
-		_.each(all_edges[k], function(v_, k_, l_) {
-			g.addEdge(null, v_[0].toString(), v_[1].toString(), v_[2])
-		})
-		var renderer = new dagreD3.Renderer();
-		var oldDrawNodes = renderer.drawNodes();
-		renderer.drawNodes(function(g, svg) {
-		  var svgNodes = oldDrawNodes(g, svg);
-		  svgNodes.attr('title', function(d) { return g.node(d).title } )
-		  .each(function (d) {$(this).click(function () {window.location.href = g.node(d).linkto })})
-		  return svgNodes;
-		});
-		svgGroup = d3.select("#" + k);
-		var layout = renderer.run(g, svgGroup);
-		var svg = d3.select("#cont_" + k);
-		svg.attr('height', layout.graph().height + 40);
-		svg.attr('width', layout.graph().width + 40);
-	})
-
-})
-
+    if (window.location.search.indexOf('refresh=1') != -1) {
+        $('#jobs_autorefresh').addClass('active')
+            .find('span').removeClass('glyphicon-repeat').addClass('glyphicon-refresh');
+    }
+    $('#jobs_autorefresh').on('click', function(e) {
+        newlocation = window.location.search.replace('?refresh=1', '') + '&refresh=1'
+        if ($(this).hasClass('active')) {
+            $('#jobs_window').addClass('w2p_component_stop');
+            $(this).removeClass('active')
+                .find('span').removeClass('glyphicon-refresh').addClass('glyphicon-repeat');
+        } else {
+            window.location = window.location.pathname + newlocation;
+        }
+    });
+});
 </script>

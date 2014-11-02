@@ -21,7 +21,7 @@
     {{if deps:}}
     <div class="btn-group">
         {{for job_name in deps:}}
-            {{=A("Job %s" % job_name, _class="btn btn-primary", _href=URL('jobs', vars=dict(job_name=job_name), user_signature=True))}}
+            {{=A("Job %s" % job_name, _class="btn btn-primary", _href=URL('jobs', vars=dict(job_name=job_name), user_signature=True, hash_vars=False))}}
         {{pass}}
     </div>
     {{pass}}

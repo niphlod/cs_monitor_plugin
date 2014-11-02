@@ -112,7 +112,7 @@ $(function() {
         $('#tchosen_action').val($(this).data('action'));
         $('#current_page').val('{{=URL(args=request.args, user_signature=True)}}');
         var link = '{{=BASEURL}}';
-        web2py_ajax_page('post', link, $('.task_status input').serialize(), '{{=request.cid}}')
+        $.web2py.ajax_page('post', link, $('.task_status input').serialize(), '{{=request.cid}}')
     });
     $('.task_status').stupidtable();
 });

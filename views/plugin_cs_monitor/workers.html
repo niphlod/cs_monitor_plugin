@@ -60,7 +60,7 @@
 
 <script type="text/javascript">
 $(function() {
-    if (window.location.search.indexOf('autorefresh=1') != -1) {
+    if (window.location.search.indexOf('refresh=1') != -1) {
         $('#workers_autorefresh').addClass('active')
             .find('span').removeClass('glyphicon-repeat').addClass('glyphicon-refresh');
     }
@@ -87,7 +87,7 @@ $(function() {
         $.web2py.invalidate(document);
     });
     $('#workers_autorefresh').on('click', function(e) {
-        newlocation = window.location.search.replace('?autorefresh=1', '') + '?autorefresh=1'
+        newlocation = window.location.search.replace('?refresh=1', '') + '?refresh=1'
         if ($(this).hasClass('active')) {
             $('#worker_window').addClass('w2p_component_stop');
             $('#tasks_window').addClass('w2p_component_stop');
