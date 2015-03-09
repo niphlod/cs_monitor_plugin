@@ -58,7 +58,7 @@
           </ul>
           <ul class="nav navbar-nav navbar-right">
             {{ mymenu = 'auth' in globals() and auth.navbar(mode="bare") or []}}
-            {{if 'user' in mymenu:}}
+            {{if mymenu.get('user'):}}
               {{=LI(
                   A("%(user)s" % mymenu, SPAN(_class="caret"), _href="#", _class="dropdown-toggle", data=dict(toggle="dropdown")),
                   UL(
